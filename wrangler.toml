@@ -1,20 +1,19 @@
-# MindSpring Cloud — Cloudflare Workers Configuration
+# MindSpring — Cloudflare Workers Configuration
 #
 # Setup steps:
 #   1. Create KV namespace:
 #        wrangler kv namespace create MINDSPRING_KV
-#      Then paste the returned ID below.
+#        wrangler kv namespace create MINDSPRING_KV --preview
 #
 #   2. Create R2 bucket:
 #        wrangler r2 bucket create mindspring-uploads
 #
-#   3. Create Queue:
+#   3. Create Vectorize index:
+#        wrangler vectorize create mindspring-conversations --dimensions=1024 --metric=cosine
+#
+#   4. Create Queues:
 #        wrangler queues create mindspring-ingestion
 #        wrangler queues create mindspring-ingestion-dlq
-#
-#   4. Set secrets:
-#        wrangler secret put QDRANT_CLOUD_URL
-#        wrangler secret put QDRANT_API_KEY
 #
 #   5. Deploy:
 #        wrangler deploy
@@ -29,6 +28,11 @@ compatibility_flags = ["nodejs_compat"]
 binding = "UPLOADS_BUCKET"
 bucket_name = "mindspring-uploads"
 
+# --- Vectorize: vector search index ---
+[[vectorize]]
+binding = "VECTORIZE"
+index_name = "mindspring-conversations"
+
 # --- Queue: async ingestion pipeline ---
 [[queues.producers]]
 binding = "INGESTION_QUEUE"
@@ -40,11 +44,11 @@ max_batch_size = 1
 max_retries = 3
 dead_letter_queue = "mindspring-ingestion-dlq"
 
-# --- KV: upload progress, processed conversation IDs ---
+# --- KV: auth keys, upload progress, conversation text, processed IDs, telemetry ---
 [[kv_namespaces]]
 binding = "KV"
-id = ""          # ← paste output of: wrangler kv namespace create MINDSPRING_KV
-preview_id = ""  # ← paste output of: wrangler kv namespace create MINDSPRING_KV --preview
+id = "19e32e801eef421e8df4ddf70e6c6a73"
+preview_id = "ee3aef76295445ccb69757a6b5ef72dd"
 
 # --- Workers AI: embedding generation ---
 [ai]
@@ -52,11 +56,6 @@ binding = "AI"
 
 # --- Environment variables ---
 [vars]
-QDRANT_COLLECTION = "conversations"
 EMBEDDING_MODEL = "@cf/baai/bge-large-en-v1.5"
 EMBEDDING_DIMENSION = "1024"
 BATCH_SIZE = "100"
-
-# --- Secrets (set via `wrangler secret put`): ---
-# QDRANT_CLOUD_URL  — e.g. https://xyz.us-east-1.aws.cloud.qdrant.io:6333
-# QDRANT_API_KEY    — from Qdrant Cloud dashboard

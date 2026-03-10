@@ -2,9 +2,9 @@ import type {
   Env,
   IngestionMessage,
   UploadProgress,
-  QdrantUpsertPoint,
+  ConversationRecord,
 } from './lib/types'
-import { QdrantClient } from './lib/qdrant'
+import { VectorStore } from './lib/vectorize'
 import { generateEmbeddings } from './lib/embeddings'
 import {
   extractConversationText,
@@ -22,12 +22,12 @@ import { logIngestionEvent } from './lib/telemetry'
  * Design constraints:
  *   - Workers memory limit: 128MB → stream-parse, never JSON.parse() the whole file
  *   - Queue consumer CPU: up to 15min → checkpoint progress in KV for resume
- *   - Batch size: 100 conversations per Qdrant upsert (aligned with PRD)
+ *   - Batch size: 100 conversations per Vectorize upsert (aligned with PRD)
  *   - Peak memory: ~2x largest single conversation, not the entire file
  *
  * The streaming parser reads from R2 as a ReadableStream, extracting
  * top-level JSON items one at a time. Items are collected in batches
- * of 100, validated, embedded, and upserted to Qdrant. Progress is
+ * of 100, validated, embedded, and upserted to Vectorize. Progress is
  * checkpointed to KV after each batch so the Queue can redeliver
  * on failure and the consumer resumes from the last checkpoint.
  */
@@ -40,7 +40,6 @@ export async function handleIngestion(
 ): Promise<void> {
   for (const message of batch.messages) {
     const { uploadId, r2Key } = message.body
-
     const startTime = Date.now()
 
     try {
@@ -97,10 +96,7 @@ async function processUpload(
     throw new Error(`R2 object has no body: ${r2Key}`)
   }
 
-  const qdrant = new QdrantClient(env)
-  const dimension = parseInt(env.EMBEDDING_DIMENSION)
-  await qdrant.ensureCollection(dimension)
-
+  const store = new VectorStore(env)
   const resumeFromBatch = Math.floor(
     progress.lastCheckpointIndex / BATCH_SIZE
   )
@@ -156,32 +152,33 @@ async function processUpload(
       const texts = validItems.map((item) => item.text)
       const embeddings = await generateEmbeddings(texts, env)
 
-      // Build Qdrant points
-      const points: QdrantUpsertPoint[] = validItems.map((item, idx) => {
+      // Build records and upsert to Vectorize + KV
+      const upsertItems = validItems.map((item, idx) => {
         const conv = item.conversation
+        const record: ConversationRecord = {
+          id: item.id,
+          title:
+            (conv.title as string) ??
+            (conv.name as string) ??
+            'Untitled',
+          text: item.text,
+          create_time: getCreateTime(conv),
+          update_time:
+            typeof conv.update_time === 'number'
+              ? conv.update_time
+              : Date.now() / 1000,
+          source: detectFormat(conv),
+          upload_id: uploadId,
+        }
+
         return {
-          id: deterministicUUID(item.id),
+          id: item.id,
           vector: embeddings[idx],
-          payload: {
-            id: item.id,
-            title:
-              (conv.title as string) ??
-              (conv.name as string) ??
-              'Untitled',
-            text: item.text,
-            create_time: getCreateTime(conv),
-            update_time:
-              typeof conv.update_time === 'number'
-                ? conv.update_time
-                : Date.now() / 1000,
-            source: detectFormat(conv),
-            upload_id: uploadId,
-          },
+          record,
         }
       })
 
-      // Upsert to Qdrant
-      await qdrant.upsert(points)
+      await store.upsert(upsertItems)
 
       // Mark conversations as processed in KV
       await Promise.all(
@@ -192,7 +189,7 @@ async function processUpload(
 
       // Checkpoint after each batch — the resume point if we crash
       await updateProgress(env, uploadId, {
-        totalConversations: null, // updated at end when stream count is known
+        totalConversations: null,
         processedConversations: processedCount,
         lastCheckpointIndex: startItemIndex + items.length,
       })
@@ -247,48 +244,4 @@ async function updateProgress(
     updatedAt: new Date().toISOString(),
   }
   await env.KV.put(`upload:${uploadId}`, JSON.stringify(updated))
-}
-
-/**
- * Generate a deterministic UUID-format string from a conversation ID.
- *
- * Qdrant requires point IDs as UUIDs or unsigned integers. We hash the
- * conversation ID into a stable UUID v4-shaped string. Uses a fast
- * non-cryptographic hash — collision resistance isn't critical since
- * upsert is idempotent.
- */
-function deterministicUUID(input: string): string {
-  let h1 = 0xdeadbeef
-  let h2 = 0x41c6ce57
-
-  for (let i = 0; i < input.length; i++) {
-    const ch = input.charCodeAt(i)
-    h1 = Math.imul(h1 ^ ch, 2654435761)
-    h2 = Math.imul(h2 ^ ch, 1597334677)
-  }
-
-  h1 =
-    Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^
-    Math.imul(h2 ^ (h2 >>> 13), 3266489909)
-  h2 =
-    Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^
-    Math.imul(h1 ^ (h1 >>> 13), 3266489909)
-
-  const hex = (
-    (h2 >>> 0).toString(16).padStart(8, '0') +
-    (h1 >>> 0).toString(16).padStart(8, '0')
-  )
-
-  // Format as UUID v4 shape: xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx
-  return (
-    hex.slice(0, 8) +
-    '-' +
-    hex.slice(8, 12) +
-    '-4' +
-    hex.slice(13, 16) +
-    '-8' +
-    hex.slice(16, 19) +
-    '-' +
-    hex.slice(19, 31).padEnd(12, '0')
-  )
 }

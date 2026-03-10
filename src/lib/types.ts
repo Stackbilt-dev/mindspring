@@ -22,16 +22,12 @@ export interface Env {
   INGESTION_QUEUE: Queue<IngestionMessage>
   KV: KVNamespace
   AI: Ai
+  VECTORIZE: VectorizeIndex
 
   // Vars
-  QDRANT_COLLECTION: string
   EMBEDDING_MODEL: string
   EMBEDDING_DIMENSION: string
   BATCH_SIZE: string
-
-  // Secrets
-  QDRANT_CLOUD_URL: string
-  QDRANT_API_KEY: string
 }
 
 // Queue message for ingestion jobs
@@ -55,8 +51,21 @@ export interface UploadProgress {
   updatedAt: string
 }
 
-// Qdrant point payload
-export interface ConversationPayload {
+// Vectorize metadata stored alongside each vector.
+// Vectorize has a 10KB metadata limit per vector, so full conversation
+// text is stored in KV (conv:{id}) and only a preview goes here.
+export interface ConversationMetadata {
+  id: string
+  title: string
+  text_preview: string  // First 500 chars for display
+  create_time: number
+  update_time: number
+  source: 'gpt' | 'claude'
+  upload_id: string
+}
+
+// Full conversation record stored in KV
+export interface ConversationRecord {
   id: string
   title: string
   text: string
@@ -66,41 +75,13 @@ export interface ConversationPayload {
   upload_id: string
 }
 
-// Search result from Qdrant
+// Search result returned to clients
 export interface SearchResult {
   id: string
   title: string
   text: string
   create_time: number
   score: number
-}
-
-// Qdrant API types
-export interface QdrantSearchResponse {
-  result: Array<{
-    id: string
-    version: number
-    score: number
-    payload: ConversationPayload
-  }>
-  status: string
-  time: number
-}
-
-export interface QdrantUpsertPoint {
-  id: string
-  vector: number[]
-  payload: ConversationPayload
-}
-
-export interface QdrantCollectionInfo {
-  result: {
-    vectors_count: number
-    indexed_vectors_count: number
-    points_count: number
-    segments_count: number
-    status: string
-  }
 }
 
 // Raw conversation formats

@@ -1,18 +1,18 @@
 import { Hono } from 'hono'
 import type { Env } from '../lib/types'
-import { QdrantClient } from '../lib/qdrant'
+import { VectorStore } from '../lib/vectorize'
 
 const stats = new Hono<{ Bindings: Env }>()
 
 /**
- * GET /api/stats — Collection statistics.
+ * GET /api/stats — Vectorize index statistics.
  */
 stats.get('/stats', async (c) => {
-  const qdrant = new QdrantClient(c.env)
+  const store = new VectorStore(c.env)
 
   try {
-    const collectionStats = await qdrant.getStats()
-    return c.json(collectionStats)
+    const info = await store.getStats()
+    return c.json(info)
   } catch (err) {
     return c.json(
       { error: 'Failed to fetch stats', detail: String(err) },
@@ -26,15 +26,15 @@ stats.get('/stats', async (c) => {
  */
 stats.get('/health', async (c) => {
   const checks: Record<string, 'ok' | 'error'> = {
-    qdrant: 'error',
+    vectorize: 'error',
     ai: 'error',
   }
 
-  // Check Qdrant connectivity
+  // Check Vectorize connectivity
   try {
-    const qdrant = new QdrantClient(c.env)
-    await qdrant.getStats()
-    checks.qdrant = 'ok'
+    const store = new VectorStore(c.env)
+    await store.getStats()
+    checks.vectorize = 'ok'
   } catch {
     // stays error
   }

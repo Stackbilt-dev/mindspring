@@ -1,5 +1,6 @@
-# Local development secrets — copy to .dev.vars
-# These are used by `wrangler dev` and never deployed
-
-QDRANT_CLOUD_URL=https://your-cluster.us-east-1.aws.cloud.qdrant.io:6333
-QDRANT_API_KEY=your-api-key-here
+# Local development — copy to .dev.vars
+# Used by `wrangler dev`, never deployed
+#
+# No secrets required — all services (Vectorize, AI, KV, R2, Queue)
+# are accessed via Cloudflare bindings. Wrangler dev handles auth
+# automatically when logged in.

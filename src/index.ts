@@ -7,6 +7,7 @@ import { rateLimit } from './lib/rate-limit'
 import { validateBodySize, validateUpload, validateSearchParams } from './lib/validate'
 import { upload } from './routes/upload'
 import { search } from './routes/search'
+import { conversations } from './routes/conversations'
 import { stats } from './routes/stats'
 import { auth } from './routes/auth'
 import { telemetry } from './routes/telemetry'
@@ -19,17 +20,14 @@ const app = new Hono<{ Bindings: Env; Variables: AppVariables }>()
 app.use(
   '/api/*',
   cors({
-    origin: '*', // Tighten in production to specific domains
+    origin: '*',
     allowMethods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
     allowHeaders: ['Content-Type', 'Authorization', 'X-API-Key', 'X-File-Name'],
     exposeHeaders: ['X-Request-Id', 'X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset'],
   })
 )
 
-// Telemetry on all API routes
 app.use('/api/*', telemetryMiddleware())
-
-// Body size guard on all POST routes
 app.use('/api/*', validateBodySize())
 
 // --- Auth management: admin only ---
@@ -45,13 +43,16 @@ app.use('/api/uploads/*', validateUpload())
 app.use('/api/uploads/*', rateLimit({ maxRequests: 10, windowSeconds: 60 }))
 app.route('/api/uploads', upload)
 
-// --- Search and browse: requires 'read' scope ---
-app.use('/api/search', requireAuth('read'))
-app.use('/api/search', validateSearchParams())
-app.use('/api/search', rateLimit({ maxRequests: 60, windowSeconds: 60 }))
+// --- Search: requires 'read' scope ---
+app.use('/api/search/*', requireAuth('read'))
+app.use('/api/search/*', validateSearchParams())
+app.use('/api/search/*', rateLimit({ maxRequests: 60, windowSeconds: 60 }))
+app.route('/api/search', search)
+
+// --- Conversations: requires 'read' scope ---
 app.use('/api/conversations/*', requireAuth('read'))
 app.use('/api/conversations/*', rateLimit({ maxRequests: 60, windowSeconds: 60 }))
-app.route('/api', search)
+app.route('/api/conversations', conversations)
 
 // --- Stats: requires 'read' scope ---
 app.use('/api/stats', requireAuth('read'))
@@ -83,8 +84,6 @@ app.get('/', (c) => {
     },
   })
 })
-
-// --- Export for Cloudflare Workers ---
 
 export default {
   fetch: app.fetch,
