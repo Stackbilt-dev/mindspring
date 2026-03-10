@@ -3,10 +3,13 @@ import { cors } from 'hono/cors'
 import type { Env, AppVariables, IngestionMessage } from './lib/types'
 import { requireAuth } from './lib/auth'
 import { telemetryMiddleware } from './lib/telemetry'
+import { rateLimit } from './lib/rate-limit'
+import { validateBodySize, validateUpload, validateSearchParams } from './lib/validate'
 import { upload } from './routes/upload'
 import { search } from './routes/search'
 import { stats } from './routes/stats'
 import { auth } from './routes/auth'
+import { telemetry } from './routes/telemetry'
 import { handleIngestion } from './queue'
 
 const app = new Hono<{ Bindings: Env; Variables: AppVariables }>()
@@ -19,46 +22,64 @@ app.use(
     origin: '*', // Tighten in production to specific domains
     allowMethods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
     allowHeaders: ['Content-Type', 'Authorization', 'X-API-Key', 'X-File-Name'],
+    exposeHeaders: ['X-Request-Id', 'X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset'],
   })
 )
 
-// Telemetry on all API routes — captures request/response metrics
+// Telemetry on all API routes
 app.use('/api/*', telemetryMiddleware())
 
-// --- Auth-gated routes ---
+// Body size guard on all POST routes
+app.use('/api/*', validateBodySize())
 
-// Auth management: admin only
+// --- Auth management: admin only ---
 app.route('/api/auth', auth)
 
-// Uploads/ingestion: requires 'ingest' scope (or higher)
+// --- Telemetry query: admin only ---
+app.use('/api/telemetry/*', requireAuth('admin'))
+app.route('/api/telemetry', telemetry)
+
+// --- Uploads: requires 'ingest' scope ---
 app.use('/api/uploads/*', requireAuth('ingest'))
+app.use('/api/uploads/*', validateUpload())
+app.use('/api/uploads/*', rateLimit({ maxRequests: 10, windowSeconds: 60 }))
 app.route('/api/uploads', upload)
 
-// Search and browse: requires 'read' scope (or higher)
+// --- Search and browse: requires 'read' scope ---
 app.use('/api/search', requireAuth('read'))
+app.use('/api/search', validateSearchParams())
+app.use('/api/search', rateLimit({ maxRequests: 60, windowSeconds: 60 }))
 app.use('/api/conversations/*', requireAuth('read'))
+app.use('/api/conversations/*', rateLimit({ maxRequests: 60, windowSeconds: 60 }))
 app.route('/api', search)
 
-// Stats: requires 'read' scope
+// --- Stats: requires 'read' scope ---
 app.use('/api/stats', requireAuth('read'))
 app.use('/api/health', requireAuth('read'))
 app.route('/api', stats)
 
 // --- Public root ---
-
 app.get('/', (c) => {
   return c.json({
-    name: 'MindSpring Cloud',
-    version: '0.2.0',
+    name: 'MindSpring',
+    version: '0.3.0',
+    description: 'Semantic search engine for AI conversation exports',
     auth: 'API key required — pass via Authorization: Bearer <key> or X-API-Key header',
+    docs: 'https://github.com/Stackbilt-dev/mindspring',
     endpoints: {
-      search: 'GET /api/search?q=<query>',
-      conversations: 'GET /api/conversations',
-      upload: 'POST /api/uploads/simple',
-      uploadMultipart: 'POST /api/uploads',
-      stats: 'GET /api/stats',
-      health: 'GET /api/health',
-      authKeys: 'POST /api/auth/keys (admin)',
+      'POST /api/uploads/simple': 'Upload a conversation file (<5MB)',
+      'POST /api/uploads': 'Initiate multipart upload for large files',
+      'GET /api/uploads/:id/status': 'Check ingestion progress',
+      'GET /api/search?q=': 'Semantic search',
+      'GET /api/conversations': 'Browse all conversations',
+      'GET /api/conversations/:id': 'Fetch a single conversation',
+      'GET /api/conversations/:id/similar': 'Find similar conversations',
+      'GET /api/stats': 'Collection statistics',
+      'GET /api/health': 'Service health check',
+      'POST /api/auth/keys': 'Create API key (admin)',
+      'GET /api/auth/keys': 'List API keys (admin)',
+      'DELETE /api/auth/keys/:name': 'Revoke API key (admin)',
+      'GET /api/telemetry': 'Query flow logs (admin)',
     },
   })
 })
