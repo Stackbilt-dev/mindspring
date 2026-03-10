@@ -1,14 +1,35 @@
+# MindSpring Cloud — Cloudflare Workers Configuration
+#
+# Setup steps:
+#   1. Create KV namespace:
+#        wrangler kv namespace create MINDSPRING_KV
+#      Then paste the returned ID below.
+#
+#   2. Create R2 bucket:
+#        wrangler r2 bucket create mindspring-uploads
+#
+#   3. Create Queue:
+#        wrangler queues create mindspring-ingestion
+#        wrangler queues create mindspring-ingestion-dlq
+#
+#   4. Set secrets:
+#        wrangler secret put QDRANT_CLOUD_URL
+#        wrangler secret put QDRANT_API_KEY
+#
+#   5. Deploy:
+#        wrangler deploy
+
 name = "mindspring"
 main = "src/index.ts"
 compatibility_date = "2025-03-01"
 compatibility_flags = ["nodejs_compat"]
 
-# R2 bucket for raw conversation uploads
+# --- R2: raw conversation JSON uploads ---
 [[r2_buckets]]
 binding = "UPLOADS_BUCKET"
 bucket_name = "mindspring-uploads"
 
-# Queue for async ingestion
+# --- Queue: async ingestion pipeline ---
 [[queues.producers]]
 binding = "INGESTION_QUEUE"
 queue = "mindspring-ingestion"
@@ -19,21 +40,23 @@ max_batch_size = 1
 max_retries = 3
 dead_letter_queue = "mindspring-ingestion-dlq"
 
-# KV for upload progress and processed IDs
+# --- KV: upload progress, processed conversation IDs ---
 [[kv_namespaces]]
 binding = "KV"
-id = "PLACEHOLDER_KV_ID"
+id = ""          # ← paste output of: wrangler kv namespace create MINDSPRING_KV
+preview_id = ""  # ← paste output of: wrangler kv namespace create MINDSPRING_KV --preview
 
-# Workers AI binding
+# --- Workers AI: embedding generation ---
 [ai]
 binding = "AI"
 
+# --- Environment variables ---
 [vars]
 QDRANT_COLLECTION = "conversations"
 EMBEDDING_MODEL = "@cf/baai/bge-large-en-v1.5"
 EMBEDDING_DIMENSION = "1024"
 BATCH_SIZE = "100"
 
-# Secrets (set via `wrangler secret put`):
-# QDRANT_CLOUD_URL
-# QDRANT_API_KEY
+# --- Secrets (set via `wrangler secret put`): ---
+# QDRANT_CLOUD_URL  — e.g. https://xyz.us-east-1.aws.cloud.qdrant.io:6333
+# QDRANT_API_KEY    — from Qdrant Cloud dashboard
