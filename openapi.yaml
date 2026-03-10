@@ -1,0 +1,871 @@
+openapi: 3.1.0
+info:
+  title: MindSpring
+  version: 0.3.0
+  description: |
+    Semantic search engine for AI conversation exports.
+    Deployed on Cloudflare Workers with Vectorize, R2, Workers AI, and KV.
+  license:
+    name: MIT
+    url: https://github.com/Stackbilt-dev/mindspring/blob/main/LICENSE
+
+servers:
+  - url: https://mindspring.blue-pine-edf6.workers.dev
+    description: Production
+
+security:
+  - bearerAuth: []
+  - apiKeyHeader: []
+
+paths:
+  /:
+    get:
+      summary: Service info
+      operationId: getRoot
+      security: []
+      tags: [system]
+      responses:
+        '200':
+          description: Service metadata and endpoint listing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    example: MindSpring
+                  version:
+                    type: string
+                    example: 0.3.0
+                  description:
+                    type: string
+                  auth:
+                    type: string
+                  docs:
+                    type: string
+                    format: uri
+                  endpoints:
+                    type: object
+                    additionalProperties:
+                      type: string
+
+  /api/search:
+    get:
+      summary: Semantic search
+      operationId: searchConversations
+      tags: [search]
+      x-auth-scope: read
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Search query text
+          schema:
+            type: string
+            maxLength: 2000
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 100
+        - name: threshold
+          in: query
+          description: Minimum similarity score
+          schema:
+            type: number
+            format: float
+            default: 0.3
+            minimum: 0
+            maximum: 1
+      responses:
+        '200':
+          description: Search results ranked by semantic similarity
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [query, count, results]
+                properties:
+                  query:
+                    type: string
+                  count:
+                    type: integer
+                  results:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SearchResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /api/conversations:
+    get:
+      summary: Browse conversations
+      operationId: listConversations
+      tags: [conversations]
+      x-auth-scope: read
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+        - name: cursor
+          in: query
+          description: Pagination cursor from previous response
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Paginated conversation list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [conversations]
+                properties:
+                  conversations:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ConversationSummary'
+                  next_cursor:
+                    type: string
+                    nullable: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/conversations/{id}:
+    get:
+      summary: Get conversation
+      operationId: getConversation
+      tags: [conversations]
+      x-auth-scope: read
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+      responses:
+        '200':
+          description: Full conversation record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationRecord'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/conversations/{id}/similar:
+    get:
+      summary: Find similar conversations
+      operationId: findSimilar
+      tags: [conversations]
+      x-auth-scope: read
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 5
+            minimum: 1
+            maximum: 20
+      responses:
+        '200':
+          description: Similar conversations ranked by similarity
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [results]
+                properties:
+                  results:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SearchResult'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/uploads/simple:
+    post:
+      summary: Upload conversation file (small)
+      operationId: simpleUpload
+      description: Direct upload for files under 5MB. Send the raw JSON as the request body.
+      tags: [uploads]
+      x-auth-scope: ingest
+      parameters:
+        - name: X-File-Name
+          in: header
+          description: Original file name
+          schema:
+            type: string
+            default: conversations.json
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              description: Raw conversation export JSON (array or object)
+      responses:
+        '202':
+          description: Upload accepted, ingestion queued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadAccepted'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '413':
+          description: File too large — use multipart upload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '415':
+          description: Invalid content type
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /api/uploads:
+    post:
+      summary: Initiate multipart upload
+      operationId: createMultipartUpload
+      description: Start a multipart upload session for large files. Returns an uploadId and R2 multipart upload ID.
+      tags: [uploads]
+      x-auth-scope: ingest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fileName]
+              properties:
+                fileName:
+                  type: string
+                  example: conversations.json
+                fileSize:
+                  type: integer
+                  description: File size in bytes
+      responses:
+        '200':
+          description: Multipart upload session created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [uploadId, r2Key, multipartUploadId]
+                properties:
+                  uploadId:
+                    type: string
+                    format: uuid
+                  r2Key:
+                    type: string
+                  multipartUploadId:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/uploads/{id}/part:
+    post:
+      summary: Upload a part
+      operationId: uploadPart
+      tags: [uploads]
+      x-auth-scope: ingest
+      parameters:
+        - $ref: '#/components/parameters/UploadId'
+        - name: partNumber
+          in: query
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+        - name: multipartUploadId
+          in: query
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '200':
+          description: Part uploaded
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [partNumber, etag]
+                properties:
+                  partNumber:
+                    type: integer
+                  etag:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/uploads/{id}/complete:
+    post:
+      summary: Complete multipart upload
+      operationId: completeUpload
+      description: Finalize the upload and enqueue ingestion.
+      tags: [uploads]
+      x-auth-scope: ingest
+      parameters:
+        - $ref: '#/components/parameters/UploadId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [multipartUploadId, parts]
+              properties:
+                multipartUploadId:
+                  type: string
+                parts:
+                  type: array
+                  items:
+                    type: object
+                    required: [partNumber, etag]
+                    properties:
+                      partNumber:
+                        type: integer
+                      etag:
+                        type: string
+      responses:
+        '202':
+          description: Upload finalized, ingestion queued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadAccepted'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/uploads/{id}/status:
+    get:
+      summary: Check ingestion progress
+      operationId: getUploadStatus
+      tags: [uploads]
+      x-auth-scope: ingest
+      parameters:
+        - $ref: '#/components/parameters/UploadId'
+      responses:
+        '200':
+          description: Current ingestion progress
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadProgress'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/stats:
+    get:
+      summary: Collection statistics
+      operationId: getStats
+      tags: [system]
+      x-auth-scope: read
+      responses:
+        '200':
+          description: Vectorize index statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  description:
+                    type: object
+                    properties:
+                      dimensions:
+                        type: integer
+                        example: 1024
+                      vectorCount:
+                        type: integer
+        '502':
+          description: Vectorize unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/health:
+    get:
+      summary: Health check
+      operationId: healthCheck
+      tags: [system]
+      x-auth-scope: read
+      responses:
+        '200':
+          description: All services healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+        '503':
+          description: One or more services degraded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+
+  /api/auth/keys:
+    post:
+      summary: Create API key
+      operationId: createApiKey
+      tags: [auth]
+      x-auth-scope: admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, scope]
+              properties:
+                name:
+                  type: string
+                  description: Human-readable label
+                  example: my-ingest-key
+                scope:
+                  $ref: '#/components/schemas/ApiKeyScope'
+      responses:
+        '201':
+          description: API key created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [apiKey, name, scope, createdAt, warning]
+                properties:
+                  apiKey:
+                    type: string
+                    description: The API key — store securely, cannot be retrieved later
+                  name:
+                    type: string
+                  scope:
+                    $ref: '#/components/schemas/ApiKeyScope'
+                  createdAt:
+                    type: string
+                    format: date-time
+                  warning:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+    get:
+      summary: List API keys
+      operationId: listApiKeys
+      description: Returns metadata only — raw keys are never exposed.
+      tags: [auth]
+      x-auth-scope: admin
+      responses:
+        '200':
+          description: List of API key metadata
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [keys]
+                properties:
+                  keys:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                        scope:
+                          $ref: '#/components/schemas/ApiKeyScope'
+                        createdAt:
+                          type: string
+                          format: date-time
+                        lastUsedAt:
+                          type: string
+                          format: date-time
+                          nullable: true
+                        revoked:
+                          type: boolean
+                        keyPrefix:
+                          type: string
+                          description: First 10 characters for identification
+
+  /api/auth/keys/{name}:
+    delete:
+      summary: Revoke API key
+      operationId: revokeApiKey
+      tags: [auth]
+      x-auth-scope: admin
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Key revoked
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  revoked:
+                    type: boolean
+                    enum: [true]
+                  name:
+                    type: string
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/telemetry:
+    get:
+      summary: Query flow logs
+      operationId: listTelemetry
+      tags: [telemetry]
+      x-auth-scope: admin
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 200
+        - name: category
+          in: query
+          schema:
+            type: string
+            enum: [request, ingestion, error, auth]
+        - name: cursor
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Telemetry events
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [count, entries]
+                properties:
+                  count:
+                    type: integer
+                  cursor:
+                    type: string
+                    nullable: true
+                  entries:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TelemetryEnvelope'
+
+  /api/telemetry/{id}:
+    get:
+      summary: Get events for a request or upload
+      operationId: getTelemetryById
+      tags: [telemetry]
+      x-auth-scope: admin
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Request ID or upload ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Events for this ID
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [requestId, count, entries]
+                properties:
+                  requestId:
+                    type: string
+                  count:
+                    type: integer
+                  entries:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TelemetryEnvelope'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: 'API key as Bearer token: `Authorization: Bearer ms_...`'
+    apiKeyHeader:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: 'API key via header: `X-API-Key: ms_...`'
+
+  parameters:
+    ConversationId:
+      name: id
+      in: path
+      required: true
+      description: Conversation ID
+      schema:
+        type: string
+    UploadId:
+      name: id
+      in: path
+      required: true
+      description: Upload session ID
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+    SearchResult:
+      type: object
+      required: [id, title, text, create_time, score]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        text:
+          type: string
+        create_time:
+          type: number
+          description: Unix timestamp (seconds)
+        score:
+          type: number
+          format: float
+          description: Cosine similarity score (0-1)
+
+    ConversationSummary:
+      type: object
+      required: [id, title, text, create_time, source]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        text:
+          type: string
+          description: First 500 characters
+        create_time:
+          type: number
+        source:
+          $ref: '#/components/schemas/ConversationSource'
+
+    ConversationRecord:
+      type: object
+      required: [id, title, text, create_time, update_time, source, upload_id]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        text:
+          type: string
+          description: Full extracted conversation text
+        create_time:
+          type: number
+        update_time:
+          type: number
+        source:
+          $ref: '#/components/schemas/ConversationSource'
+        upload_id:
+          type: string
+          format: uuid
+
+    ConversationSource:
+      type: string
+      enum: [gpt, claude]
+
+    UploadAccepted:
+      type: object
+      required: [status, uploadId]
+      properties:
+        status:
+          type: string
+          enum: [processing]
+        uploadId:
+          type: string
+          format: uuid
+
+    UploadProgress:
+      type: object
+      required: [status, r2Key, fileName, fileSize, totalConversations, processedConversations, lastCheckpointIndex, createdAt, updatedAt]
+      properties:
+        status:
+          type: string
+          enum: [uploading, processing, completed, failed]
+        r2Key:
+          type: string
+        fileName:
+          type: string
+        fileSize:
+          type: integer
+        totalConversations:
+          type: integer
+          nullable: true
+        processedConversations:
+          type: integer
+        lastCheckpointIndex:
+          type: integer
+        errorMessage:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ApiKeyScope:
+      type: string
+      enum: [admin, ingest, read]
+      description: 'Hierarchical: admin > ingest > read'
+
+    HealthStatus:
+      type: object
+      required: [status, checks]
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded]
+        checks:
+          type: object
+          properties:
+            vectorize:
+              type: string
+              enum: [ok, error]
+            ai:
+              type: string
+              enum: [ok, error]
+
+    TelemetryEnvelope:
+      type: object
+      required: [requestId, timestamp, service, category]
+      properties:
+        requestId:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        service:
+          type: string
+          enum: [mindspring]
+        category:
+          type: string
+          enum: [request, ingestion, search, auth, error]
+        method:
+          type: string
+        path:
+          type: string
+        status:
+          type: integer
+        durationMs:
+          type: number
+        authKeyName:
+          type: string
+        data:
+          type: object
+          additionalProperties: true
+        error:
+          type: object
+          properties:
+            message:
+              type: string
+            stack:
+              type: string
+
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+        detail:
+          type: string
+
+  responses:
+    BadRequest:
+      description: Invalid request parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Missing or invalid API key
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    RateLimited:
+      description: Rate limit exceeded
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+        X-RateLimit-Limit:
+          schema:
+            type: integer
+        X-RateLimit-Remaining:
+          schema:
+            type: integer
+        X-RateLimit-Reset:
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+              retryAfter:
+                type: integer
+              limit:
+                type: integer
+              window:
+                type: string
+
+tags:
+  - name: search
+    description: Semantic search across conversations
+  - name: conversations
+    description: Browse, read, and discover conversations
+  - name: uploads
+    description: Upload conversation exports and track ingestion
+  - name: auth
+    description: API key management (admin only)
+  - name: telemetry
+    description: Structured flow logs (admin only)
+  - name: system
+    description: Health checks and statistics
