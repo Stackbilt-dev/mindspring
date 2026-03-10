@@ -14,6 +14,7 @@ import {
   getCreateTime,
 } from './lib/extract'
 import { streamParseBatched } from './lib/stream-parser'
+import { logIngestionEvent } from './lib/telemetry'
 
 /**
  * Queue consumer — processes uploaded conversation JSON files.
@@ -40,11 +41,26 @@ export async function handleIngestion(
   for (const message of batch.messages) {
     const { uploadId, r2Key } = message.body
 
+    const startTime = Date.now()
+
     try {
+      await logIngestionEvent(env, { uploadId, action: 'started' })
       await processUpload(uploadId, r2Key, env)
+      await logIngestionEvent(env, {
+        uploadId,
+        action: 'completed',
+        durationMs: Date.now() - startTime,
+      })
       message.ack()
     } catch (err) {
       console.error(`Ingestion failed for ${uploadId}:`, err)
+
+      await logIngestionEvent(env, {
+        uploadId,
+        action: 'failed',
+        durationMs: Date.now() - startTime,
+        errorMessage: String(err),
+      })
 
       await updateProgress(env, uploadId, {
         status: 'failed',

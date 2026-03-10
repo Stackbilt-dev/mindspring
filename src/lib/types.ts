@@ -1,3 +1,21 @@
+// API key types — defined here to avoid circular imports between auth.ts and types.ts
+export interface ApiKeyRecord {
+  name: string
+  scope: ApiKeyScope
+  createdAt: string
+  lastUsedAt: string | null
+  revoked: boolean
+}
+
+export type ApiKeyScope = 'admin' | 'ingest' | 'read'
+
+// Hono context variables set by middleware
+export interface AppVariables {
+  requestId: string
+  authKey: string
+  authRecord: ApiKeyRecord
+}
+
 // Cloudflare bindings
 export interface Env {
   UPLOADS_BUCKET: R2Bucket
