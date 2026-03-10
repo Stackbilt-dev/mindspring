@@ -1,0 +1,39 @@
+name = "mindspring"
+main = "src/index.ts"
+compatibility_date = "2025-03-01"
+compatibility_flags = ["nodejs_compat"]
+
+# R2 bucket for raw conversation uploads
+[[r2_buckets]]
+binding = "UPLOADS_BUCKET"
+bucket_name = "mindspring-uploads"
+
+# Queue for async ingestion
+[[queues.producers]]
+binding = "INGESTION_QUEUE"
+queue = "mindspring-ingestion"
+
+[[queues.consumers]]
+queue = "mindspring-ingestion"
+max_batch_size = 1
+max_retries = 3
+dead_letter_queue = "mindspring-ingestion-dlq"
+
+# KV for upload progress and processed IDs
+[[kv_namespaces]]
+binding = "KV"
+id = "PLACEHOLDER_KV_ID"
+
+# Workers AI binding
+[ai]
+binding = "AI"
+
+[vars]
+QDRANT_COLLECTION = "conversations"
+EMBEDDING_MODEL = "@cf/baai/bge-large-en-v1.5"
+EMBEDDING_DIMENSION = "1024"
+BATCH_SIZE = "100"
+
+# Secrets (set via `wrangler secret put`):
+# QDRANT_CLOUD_URL
+# QDRANT_API_KEY
