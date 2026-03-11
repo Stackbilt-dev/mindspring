@@ -11,7 +11,7 @@ Thanks for your interest in contributing. This document covers the conventions a
    npm install
    ```
 
-2. **Local secrets**: Copy `.dev.vars.example` to `.dev.vars` and fill in your Qdrant Cloud credentials.
+2. **Configure**: Copy `.env.example` to `.env` and add your `CLOUDFLARE_API_TOKEN`.
 
 3. **Run locally**:
    ```bash
@@ -45,11 +45,23 @@ src/
 ├── lib/           — Shared libraries (auth, telemetry, parsing, clients)
 │   └── __tests__/ — Unit tests co-located with their modules
 └── routes/        — Hono route handlers, one file per resource
+frontend/
+├── index.html     — App shell
+├── styles.css     — Design system (CSS custom properties, no preprocessor)
+└── app.js         — Vanilla JS SPA (no build step, no framework)
 ```
 
 - **`lib/`** contains pure logic and middleware that doesn't depend on route structure.
 - **`routes/`** contains Hono route handlers grouped by resource. Each file exports a `Hono` instance that gets mounted in `index.ts`.
+- **`frontend/`** is served as static assets via Cloudflare Workers Static Assets. No build step — edit and deploy.
 - **Tests** go in `lib/__tests__/` or `routes/__tests__/`, mirroring the source structure.
+
+### Frontend Conventions
+
+- **No frameworks, no build tools.** The frontend is vanilla HTML/CSS/JS.
+- **CSS custom properties** defined in `:root` for theming. Follow the Cloud Architecture palette.
+- **Fonts**: Syne (display), DM Sans (body), JetBrains Mono (data). Do not add additional font imports.
+- **No npm dependencies** in the frontend. Everything is self-contained.
 
 ### TypeScript
 
@@ -86,7 +98,7 @@ All observable events should write a `TelemetryEnvelope` to KV via `logEvent()` 
 2. Export a `Hono` instance with your route handlers.
 3. Mount it in `src/index.ts` with the appropriate auth and rate limit middleware.
 4. Add the endpoint to the root `/` endpoint listing.
-5. Document it in `README.md` under the API Reference section.
+5. Document it in `openapi.yaml` and `README.md`.
 
 ## Adding a New Library Module
 

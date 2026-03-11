@@ -1,5 +1,7 @@
 # MindSpring Cloud — Product Requirements Document
 
+> **Note:** This PRD was written during initial planning and references Qdrant Cloud as the vector store. During implementation, the project pivoted to **Cloudflare Vectorize** to keep the entire stack Cloudflare-native. Full conversation text is stored in KV (`conv:{id}`) due to Vectorize's 10KB metadata limit. All other architectural decisions remain as described. See `README.md` for the current architecture.
+
 ## 1. Overview
 
 Replatform MindSpring from a local Python/Streamlit application to a cloud-native TypeScript service deployed on Cloudflare, using Hono as the API framework. The resulting product is a web service where users upload their GPT/Claude conversation exports, which are ingested asynchronously, embedded, stored in a vector database, and made searchable through a browser-based UI.

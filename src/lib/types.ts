@@ -23,6 +23,7 @@ export interface Env {
   KV: KVNamespace
   AI: Ai
   VECTORIZE: VectorizeIndex
+  ASSETS: Fetcher
 
   // Vars
   EMBEDDING_MODEL: string

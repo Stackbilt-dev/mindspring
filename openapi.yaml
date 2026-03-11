@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MindSpring
-  version: 0.3.0
+  version: 0.4.0
   description: |
     Semantic search engine for AI conversation exports.
     Deployed on Cloudflare Workers with Vectorize, R2, Workers AI, and KV.
@@ -49,6 +49,71 @@ paths:
                     type: object
                     additionalProperties:
                       type: string
+
+  /api/chat:
+    post:
+      summary: RAG chat
+      operationId: chatWithHistory
+      tags: [chat]
+      x-auth-scope: read
+      description: |
+        Ask questions about your conversation history. Retrieves relevant
+        conversations via semantic search, then generates a synthesized
+        answer using DeepSeek R1 reasoning model.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [question]
+              properties:
+                question:
+                  type: string
+                  maxLength: 2000
+                  description: The question to ask about your conversation history
+                  example: What recurring themes appear across my conversations?
+                history:
+                  type: array
+                  description: Previous chat messages for multi-turn context
+                  items:
+                    type: object
+                    required: [role, content]
+                    properties:
+                      role:
+                        type: string
+                        enum: [user, assistant]
+                      content:
+                        type: string
+      responses:
+        '200':
+          description: Generated answer with source citations
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  answer:
+                    type: string
+                    description: Synthesized response from the reasoning model
+                  sources:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        title:
+                          type: string
+                        score:
+                          type: number
+                          format: float
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /api/search:
     get:
@@ -857,6 +922,8 @@ components:
                 type: string
 
 tags:
+  - name: chat
+    description: RAG chat — ask questions about your conversation history
   - name: search
     description: Semantic search across conversations
   - name: conversations
