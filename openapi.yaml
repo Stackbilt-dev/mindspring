@@ -10,8 +10,8 @@ info:
     url: https://github.com/Stackbilt-dev/mindspring/blob/main/LICENSE
 
 servers:
-  - url: https://mindspring.blue-pine-edf6.workers.dev
-    description: Production
+  - url: https://mindspring.example.com
+    description: Production (replace with your Worker URL)
 
 security:
   - bearerAuth: []

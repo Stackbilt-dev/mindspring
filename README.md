@@ -4,8 +4,6 @@ Semantic search engine for AI conversation exports, deployed on Cloudflare Worke
 
 Upload your ChatGPT or Claude conversation exports, and MindSpring indexes them into a vector database for semantic search, similarity analysis, and RAG-powered chat — all running at the edge with zero GPU infrastructure to manage.
 
-**Live**: [mindspring.blue-pine-edf6.workers.dev](https://mindspring.blue-pine-edf6.workers.dev)
-
 ## Architecture
 
 ```
