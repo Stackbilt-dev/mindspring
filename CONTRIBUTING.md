@@ -28,7 +28,7 @@ Thanks for your interest in contributing. This document covers the conventions a
 
 ### Module Size Limit
 
-Every source file must stay under **400 lines**. If a module is approaching this limit, decompose it into focused sub-modules. This is a hard constraint inherited from the broader StackBilt architecture.
+Every source file must stay under **400 lines**. If a module is approaching this limit, decompose it into focused sub-modules. This is a hard constraint inherited from the broader Stackbilt architecture.
 
 ### Zero External Runtime Dependencies
 
@@ -77,7 +77,7 @@ frontend/
 
 ### Telemetry
 
-All observable events should write a `TelemetryEnvelope` to KV via `logEvent()` or `logIngestionEvent()`. This is the standard observability format for the StackBilt ecosystem. Include:
+All observable events should write a `TelemetryEnvelope` to KV via `logEvent()` or `logIngestionEvent()`. This is the standard observability format for the Stackbilt ecosystem. Include:
 
 - `requestId` for correlation
 - `category` for filtering (`request`, `ingestion`, `error`, `auth`)

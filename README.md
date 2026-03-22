@@ -1,3 +1,7 @@
+<div align="center">
+<img src="assets/banner.png" alt="MindSpring — semantic conversation search" width="100%" />
+</div>
+
 # MindSpring
 
 Semantic search engine for AI conversation exports, deployed on Cloudflare Workers.
@@ -312,3 +316,13 @@ wrangler.toml                 — Cloudflare Workers configuration + bindings
 ## License
 
 MIT
+
+---
+
+Built by [Stackbilt](https://stackbilt.dev) — MIT License
+
+<p>
+  <a href="https://github.com/Stackbilt-dev/mindspring">
+    <img src="https://img.shields.io/badge/GitHub-Stackbilt--dev/mindspring-181717?style=for-the-badge&logo=github" alt="GitHub" />
+  </a>
+</p>
