@@ -3,8 +3,11 @@ dist/
 .wrangler/
 .dev.vars
 .env
-# cc-taskrunner worktree protection
-C:*
-node_modules/
 .pnpm-store/
 __pycache__/
+
+# cc-taskrunner worktree protection
+C:*
+
+# Internal planning documents — PRD.md is already tracked but future changes should be assessed
+# before committing. Consider docs/design-rationale.md for public-facing design context.
