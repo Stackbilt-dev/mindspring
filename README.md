@@ -4,9 +4,12 @@
 
 # MindSpring
 
-Semantic search engine for AI conversation exports, deployed on Cloudflare Workers.
+Cloudflare-native source intelligence backend for Knowledge Notebooks.
 
-Upload your ChatGPT or Claude conversation exports, and MindSpring indexes them into a vector database for semantic search, similarity analysis, and RAG-powered chat — all running at the edge with zero GPU infrastructure to manage.
+MindSpring started as semantic search over ChatGPT/Claude exports and now runs in a hybrid mode:
+
+- `v1`: conversation archive ingestion/search/chat
+- `v2`: workspace-scoped Knowledge Notebooks with sources, ingestion jobs, scoped retrieval, chat, and persisted artifacts
 
 ## Current State
 
@@ -15,11 +18,19 @@ MindSpring is currently in a hybrid state:
 - `v1` routes (`/api/*`) are production-ready for conversation export ingestion/search/chat.
 - `v2` routes (`/api/v2/workspaces/:workspaceId/notebooks/*`) are live for notebook scaffolding and backend ingestion flow:
   - create notebook
+  - list/get/update/soft-delete notebook
   - register source upload
+  - list/get notebook sources
   - job status polling
+  - notebook-scoped search
   - notebook-scoped chat with citations
-- `v2` parser support is currently limited to `markdown` and `txt`.
-- `v2` artifact persistence is not implemented yet (`501` placeholder route).
+  - chunk diagnostics (`GET .../chunks`)
+  - artifact create/list/detail with source-hash snapshots and stale detection
+- `v2` parser support currently includes:
+  - `markdown`
+  - `txt`
+  - `chat_export`
+- NDJSON thread ingestion is supported on the simple upload path and is compatible with scheduled write pipelines like AEGIS `conversation-facts`.
 
 ## OSS Hygiene Policy
 
@@ -145,6 +156,26 @@ Open your Worker URL in a browser. Go to **Settings**, paste your API key, and s
 ## API Reference
 
 All endpoints require an API key via `Authorization: Bearer <key>` or `X-API-Key: <key>`.
+
+### v2 Knowledge Notebooks
+
+| Method | Path | Scope | Description |
+|--------|------|-------|-------------|
+| `POST` | `/api/v2/workspaces/:workspaceId/notebooks` | `read` | Create notebook |
+| `GET` | `/api/v2/workspaces/:workspaceId/notebooks` | `read` | List notebooks |
+| `GET` | `/api/v2/workspaces/:workspaceId/notebooks/:notebookId` | `read` | Get notebook |
+| `PATCH` | `/api/v2/workspaces/:workspaceId/notebooks/:notebookId` | `read` | Update notebook metadata/instructions |
+| `DELETE` | `/api/v2/workspaces/:workspaceId/notebooks/:notebookId` | `read` | Soft-delete notebook |
+| `POST` | `/api/v2/workspaces/:workspaceId/notebooks/:notebookId/sources` | `read` | Register source from uploaded file |
+| `GET` | `/api/v2/workspaces/:workspaceId/notebooks/:notebookId/sources` | `read` | List notebook sources |
+| `GET` | `/api/v2/workspaces/:workspaceId/notebooks/:notebookId/sources/:sourceId` | `read` | Get source detail |
+| `GET` | `/api/v2/workspaces/:workspaceId/notebooks/:notebookId/jobs/:jobId` | `read` | Poll ingestion job status |
+| `POST` | `/api/v2/workspaces/:workspaceId/notebooks/:notebookId/search` | `read` | Notebook-scoped semantic search |
+| `POST` | `/api/v2/workspaces/:workspaceId/notebooks/:notebookId/chat` | `read` | Notebook-scoped chat with citations |
+| `GET` | `/api/v2/workspaces/:workspaceId/notebooks/:notebookId/chunks` | `read` | Chunk diagnostics |
+| `POST` | `/api/v2/workspaces/:workspaceId/notebooks/:notebookId/artifacts` | `read` | Create artifact (`briefing_doc`, `faq_glossary`, `implementation_plan`, `world_bible`) |
+| `GET` | `/api/v2/workspaces/:workspaceId/notebooks/:notebookId/artifacts` | `read` | List artifacts |
+| `GET` | `/api/v2/workspaces/:workspaceId/notebooks/:notebookId/artifacts/:artifactId` | `read` | Get artifact detail (includes `stale`) |
 
 ### Search & Chat
 
