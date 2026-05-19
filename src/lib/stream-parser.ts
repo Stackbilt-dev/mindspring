@@ -255,3 +255,82 @@ export async function streamParseBatched(
 
   return { totalItems, batchCount: batchIndex }
 }
+
+/**
+ * Stream-parse newline-delimited JSON (NDJSON), yielding parsed objects in batches.
+ */
+export async function streamParseNdjsonBatched(
+  stream: ReadableStream<Uint8Array>,
+  batchSize: number,
+  onBatch: (
+    items: Array<Record<string, unknown>>,
+    batchIndex: number,
+    startItemIndex: number
+  ) => Promise<void>,
+  onError?: (error: Error, rawLine: string, index: number) => void
+): Promise<{ totalItems: number; batchCount: number }> {
+  const reader = stream.getReader()
+  const decoder = new TextDecoder()
+
+  let buffer = ''
+  let batch: Array<Record<string, unknown>> = []
+  let batchIndex = 0
+  let batchStartIndex = 0
+  let totalItems = 0
+
+  async function flushLine(line: string): Promise<void> {
+    const trimmed = line.trim()
+    if (!trimmed) return
+
+    try {
+      const parsed = JSON.parse(trimmed) as Record<string, unknown>
+      batch.push(parsed)
+      totalItems++
+
+      if (batch.length >= batchSize) {
+        await onBatch(batch, batchIndex, batchStartIndex)
+        batchIndex++
+        batchStartIndex = totalItems
+        batch = []
+      }
+    } catch (err) {
+      onError?.(
+        err instanceof Error ? err : new Error(String(err)),
+        trimmed.slice(0, 200),
+        totalItems
+      )
+      totalItems++
+    }
+  }
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+
+      buffer += decoder.decode(value, { stream: true })
+
+      let newlineIndex = buffer.indexOf('\n')
+      while (newlineIndex !== -1) {
+        const line = buffer.slice(0, newlineIndex)
+        await flushLine(line)
+        buffer = buffer.slice(newlineIndex + 1)
+        newlineIndex = buffer.indexOf('\n')
+      }
+    }
+
+    buffer += decoder.decode()
+    if (buffer.trim()) {
+      await flushLine(buffer)
+    }
+
+    if (batch.length > 0) {
+      await onBatch(batch, batchIndex, batchStartIndex)
+      batchIndex++
+    }
+  } finally {
+    reader.releaseLock()
+  }
+
+  return { totalItems, batchCount: batchIndex }
+}

@@ -41,6 +41,22 @@ export function extractConversationText(
         messages.push(`${sender}: ${text}`)
       }
     }
+  } else if (conversation.messages) {
+    // AEGIS NDJSON thread format: messages[] with author.role + content.parts[]
+    const threadMessages = conversation.messages as Array<Record<string, unknown>>
+    for (const msg of threadMessages) {
+      const author = (msg.author as Record<string, unknown> | undefined)?.role
+      const role = (author as string) ?? 'unknown'
+      const content = msg.content as Record<string, unknown> | undefined
+      const parts = content?.parts as Array<unknown> | undefined
+      if (parts?.length) {
+        const text = parts
+          .filter((p) => typeof p === 'string')
+          .join(' ')
+          .trim()
+        if (text) messages.push(`${role}: ${text}`)
+      }
+    }
   }
 
   const title =
@@ -57,7 +73,7 @@ export function extractConversationText(
 export function detectFormat(
   conversation: Record<string, unknown>
 ): 'gpt' | 'claude' {
-  if (conversation.mapping) return 'gpt'
+  if (conversation.mapping || conversation.messages) return 'gpt'
   return 'claude'
 }
 
@@ -91,6 +107,19 @@ export function validateConversation(
     return messages.some((msg) => {
       if (typeof msg !== 'object' || msg === null) return false
       return (msg as Record<string, unknown>).text != null
+    })
+  }
+
+  if (conversation.messages) {
+    const messages = conversation.messages as Array<unknown>
+    if (!Array.isArray(messages)) return false
+    return messages.some((msg) => {
+      if (typeof msg !== 'object' || msg === null) return false
+      const content = (msg as Record<string, unknown>).content as
+        | Record<string, unknown>
+        | undefined
+      const parts = content?.parts as Array<unknown> | undefined
+      return Array.isArray(parts) && parts.some((p) => typeof p === 'string')
     })
   }
 

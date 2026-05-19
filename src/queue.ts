@@ -13,7 +13,7 @@ import {
   getConversationId,
   getCreateTime,
 } from './lib/extract'
-import { streamParseBatched } from './lib/stream-parser'
+import { streamParseBatched, streamParseNdjsonBatched } from './lib/stream-parser'
 import { logIngestionEvent } from './lib/telemetry'
 import { processV2Ingestion, type V2IngestionPayload } from './lib/v2-ingestion'
 
@@ -140,8 +140,12 @@ async function processUpload(
   let processedCount = progress?.processedConversations ?? 0
   let parseErrors = 0
 
-  // Stream-parse the JSON, processing items in batches of 100
-  const { totalItems, batchCount } = await streamParseBatched(
+  const fileName = progress?.fileName ?? r2Key.split('/').pop() ?? ''
+  const isNdjson = fileName.toLowerCase().endsWith('.ndjson')
+  const parseBatched = isNdjson ? streamParseNdjsonBatched : streamParseBatched
+
+  // Stream-parse the payload, processing items in batches of 100
+  const { totalItems, batchCount } = await parseBatched(
     stream,
     BATCH_SIZE,
     async (items, batchIndex, startItemIndex) => {

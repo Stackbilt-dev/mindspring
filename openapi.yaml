@@ -280,6 +280,14 @@ paths:
           application/json:
             schema:
               description: Raw conversation export JSON (array or object)
+          application/x-ndjson:
+            schema:
+              type: string
+              description: NDJSON thread records (one conversation object per line)
+          text/plain:
+            schema:
+              type: string
+              description: NDJSON thread records (one conversation object per line)
       responses:
         '202':
           description: Upload accepted, ingestion queued

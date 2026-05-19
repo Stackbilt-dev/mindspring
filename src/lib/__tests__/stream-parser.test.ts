@@ -13,7 +13,11 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { streamParseJSON, streamParseBatched } from '../stream-parser'
+import {
+  streamParseJSON,
+  streamParseBatched,
+  streamParseNdjsonBatched,
+} from '../stream-parser'
 
 /** Helper: convert a string to a ReadableStream of Uint8Array chunks. */
 function stringToStream(
@@ -257,5 +261,36 @@ describe('streamParseBatched', () => {
     expect(batches[1].startIndex).toBe(100)
     expect(batches[2].items).toHaveLength(50)
     expect(batches[2].startIndex).toBe(200)
+  })
+})
+
+describe('streamParseNdjsonBatched', () => {
+  it('parses NDJSON lines in batches', async () => {
+    const ndjson = [
+      JSON.stringify({ id: '1', title: 'One' }),
+      JSON.stringify({ id: '2', title: 'Two' }),
+      JSON.stringify({ id: '3', title: 'Three' }),
+    ].join('\n')
+
+    const batches: Array<{
+      items: Array<Record<string, unknown>>
+      batchIndex: number
+      startIndex: number
+    }> = []
+
+    const result = await streamParseNdjsonBatched(
+      stringToStream(ndjson, 5),
+      2,
+      async (items, batchIndex, startIndex) => {
+        batches.push({ items: [...items], batchIndex, startIndex })
+      }
+    )
+
+    expect(result.totalItems).toBe(3)
+    expect(result.batchCount).toBe(2)
+    expect(batches[0].items).toHaveLength(2)
+    expect(batches[0].startIndex).toBe(0)
+    expect(batches[1].items).toHaveLength(1)
+    expect(batches[1].startIndex).toBe(2)
   })
 })

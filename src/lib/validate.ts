@@ -23,6 +23,8 @@ const MAX_QUERY_LENGTH = 2000
 const ALLOWED_UPLOAD_TYPES = [
   'application/json',
   'application/octet-stream',
+  'application/x-ndjson',
+  'text/plain',
 ]
 
 type AppContext = Context<{ Bindings: Env; Variables: AppVariables }>
