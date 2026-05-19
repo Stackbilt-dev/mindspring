@@ -186,6 +186,8 @@ All endpoints require an API key via `Authorization: Bearer <key>` or `X-API-Key
 
 The full OpenAPI 3.1 specification is in [`openapi.yaml`](openapi.yaml).
 
+Agent-first integration docs are in [`docs/AGENT_API_GUIDE.md`](docs/AGENT_API_GUIDE.md).
+
 ## Supported Formats
 
 MindSpring accepts conversation exports from:
