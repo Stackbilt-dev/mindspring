@@ -87,8 +87,8 @@ async function main() {
 
   let lastError = null
   let jobStatus = null
-  for (let i = 0; i < 30; i++) {
-    await sleep(1000)
+  for (let i = 0; i < 20; i++) {
+    await sleep(2000)
     try {
       jobStatus = await request(
         `/api/v2/workspaces/${workspaceId}/notebooks/${notebook.id}/jobs/${sourceReg.jobId}`

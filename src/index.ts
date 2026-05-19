@@ -13,6 +13,7 @@ import { auth } from './routes/auth'
 import { telemetry } from './routes/telemetry'
 import { chat } from './routes/chat'
 import { notebooksV2 } from './routes/notebooks-v2'
+import { notebooksV2Manage } from './routes/notebooks-v2-manage'
 import { handleIngestion } from './queue'
 
 const app = new Hono<{ Bindings: Env; Variables: AppVariables }>()
@@ -23,7 +24,7 @@ app.use(
   '/api/*',
   cors({
     origin: '*',
-    allowMethods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
+    allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
     allowHeaders: ['Content-Type', 'Authorization', 'X-API-Key', 'X-File-Name'],
     exposeHeaders: ['X-Request-Id', 'X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset'],
   })
@@ -82,6 +83,7 @@ app.route('/api/conversations', conversations)
 app.use('/api/v2/workspaces/*', requireAuth('read'))
 app.use('/api/v2/workspaces/*', rateLimit({ maxRequests: 30, windowSeconds: 60 }))
 app.route('/api/v2/workspaces/:workspaceId/notebooks', notebooksV2)
+app.route('/api/v2/workspaces/:workspaceId/notebooks', notebooksV2Manage)
 
 // --- Stats: requires 'read' scope ---
 app.use('/api/stats', requireAuth('read'))

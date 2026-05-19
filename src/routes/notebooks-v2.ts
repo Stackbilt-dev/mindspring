@@ -12,11 +12,13 @@ function requireParam(value: string | undefined, name: string): string {
 }
 
 const VALID_NOTEBOOK_TYPES = new Set([
+  'conversation_archive',
   'dev_docs',
   'style_guide',
   'narrative_bible',
   'workflow_ops',
   'personal_archive',
+  'research',
 ])
 
 const VALID_SOURCE_TYPES = new Set([
@@ -56,11 +58,13 @@ notebooksV2.post('/', async (c) => {
       title: body.title.trim(),
       description: body.description,
       type: body.type as
+        | 'conversation_archive'
         | 'dev_docs'
         | 'style_guide'
         | 'narrative_bible'
         | 'workflow_ops'
-        | 'personal_archive',
+        | 'personal_archive'
+        | 'research',
       instructions: body.instructions ?? '',
     })
     return c.json(notebook, 201)

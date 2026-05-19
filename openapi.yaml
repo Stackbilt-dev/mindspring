@@ -686,6 +686,25 @@ paths:
           $ref: '#/components/responses/NotFound'
 
   /api/v2/workspaces/{workspaceId}/notebooks:
+    get:
+      summary: List notebooks
+      operationId: listNotebooksV2
+      tags: [notebooks-v2]
+      x-auth-scope: read
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      responses:
+        '200':
+          description: Notebooks in workspace
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  notebooks:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Notebook'
     post:
       summary: Create notebook
       operationId: createNotebookV2
@@ -708,6 +727,17 @@ paths:
                 $ref: '#/components/schemas/Notebook'
 
   /api/v2/workspaces/{workspaceId}/notebooks/{notebookId}/sources:
+    get:
+      summary: List notebook sources
+      operationId: listNotebookSourcesV2
+      tags: [notebooks-v2]
+      x-auth-scope: read
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/NotebookId'
+      responses:
+        '200':
+          description: Notebook source inventory
     post:
       summary: Register source upload
       operationId: registerSourceUploadV2
@@ -744,6 +774,78 @@ paths:
       responses:
         '200':
           description: Chat response with citations
+
+  /api/v2/workspaces/{workspaceId}/notebooks/{notebookId}:
+    get:
+      summary: Get notebook
+      operationId: getNotebookV2
+      tags: [notebooks-v2]
+      x-auth-scope: read
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/NotebookId'
+      responses:
+        '200':
+          description: Notebook details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notebook'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      summary: Update notebook
+      operationId: updateNotebookV2
+      tags: [notebooks-v2]
+      x-auth-scope: read
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/NotebookId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotebookPatchRequest'
+      responses:
+        '200':
+          description: Updated notebook
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      summary: Soft-delete notebook
+      operationId: deleteNotebookV2
+      tags: [notebooks-v2]
+      x-auth-scope: read
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/NotebookId'
+      responses:
+        '200':
+          description: Notebook soft-deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v2/workspaces/{workspaceId}/notebooks/{notebookId}/sources/{sourceId}:
+    get:
+      summary: Get notebook source
+      operationId: getNotebookSourceV2
+      tags: [notebooks-v2]
+      x-auth-scope: read
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/NotebookId'
+        - name: sourceId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Source details
+        '404':
+          $ref: '#/components/responses/NotFound'
 
   /api/v2/workspaces/{workspaceId}/notebooks/{notebookId}/artifacts:
     post:
@@ -852,7 +954,7 @@ components:
           nullable: true
         type:
           type: string
-          enum: [dev_docs, style_guide, narrative_bible, workflow_ops, personal_archive]
+          enum: [conversation_archive, dev_docs, style_guide, narrative_bible, workflow_ops, personal_archive, research]
         instructions:
           type: string
         created_at:
@@ -871,7 +973,20 @@ components:
           type: string
         type:
           type: string
-          enum: [dev_docs, style_guide, narrative_bible, workflow_ops, personal_archive]
+          enum: [conversation_archive, dev_docs, style_guide, narrative_bible, workflow_ops, personal_archive, research]
+    NotebookPatchRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        instructions:
+          type: string
+        type:
+          type: string
+          enum: [conversation_archive, dev_docs, style_guide, narrative_bible, workflow_ops, personal_archive, research]
         instructions:
           type: string
     RegisterSourceUploadRequest:
