@@ -1,6 +1,7 @@
 import type { Env, ConversationRecord } from './types'
 import { generateEmbeddings } from './embeddings'
 import { VectorStore } from './vectorize'
+import { extractConversationText, validateConversation } from './extract'
 
 export interface V2IngestionPayload {
   job_id: string
@@ -172,6 +173,38 @@ function normalizeSourceText(
 
   if (parserType === 'markdown' || parserType === 'txt') {
     return cleaned
+  }
+
+  if (parserType === 'chat_export') {
+    const parsed = JSON.parse(cleaned) as unknown
+    const records: Array<Record<string, unknown>> = []
+
+    if (Array.isArray(parsed)) {
+      for (const item of parsed) {
+        if (typeof item === 'object' && item !== null) {
+          records.push(item as Record<string, unknown>)
+        }
+      }
+    } else if (parsed && typeof parsed === 'object') {
+      for (const item of Object.values(parsed as Record<string, unknown>)) {
+        if (typeof item === 'object' && item !== null) {
+          records.push(item as Record<string, unknown>)
+        }
+      }
+    } else {
+      throw new Error('chat_export payload must be JSON array or object')
+    }
+
+    const extracted = records
+      .filter((record) => validateConversation(record))
+      .map((record) => extractConversationText(record))
+      .filter((text) => text.trim().length > 0)
+
+    if (extracted.length === 0) {
+      throw new Error('chat_export payload contained no valid conversations')
+    }
+
+    return extracted.join('\n\n---\n\n')
   }
 
   throw new Error(`Parser type '${parserType}' not yet implemented in v2 ingestion`)

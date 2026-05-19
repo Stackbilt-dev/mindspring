@@ -12,17 +12,18 @@
   - job status polling
   - notebook chat with citation fallback
   - notebook search + chunk diagnostics
+  - artifact create/list/detail with snapshot hashes and stale detection
 - v2 parsers currently implemented:
   - `markdown`
   - `txt`
+  - `chat_export`
   - NDJSON thread ingestion path for AEGIS-compatible writes
 
 ## Next
 
-- Implement v2 artifact persistence (`POST /artifacts`) with `snapshot_hashes`
-- Implement `chat_export` parser under v2 pipeline
 - Add source-level invalidation/staleness markers for artifacts
 - Add migration bridge strategy for optional v1 -> v2 notebook wrapping
+- Add artifact citation persistence rows (`citations.artifact_id`) for full audit trail
 
 ## Later
 

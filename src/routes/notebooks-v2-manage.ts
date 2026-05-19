@@ -3,12 +3,17 @@ import type { Env } from '../lib/types'
 import {
   getNotebook,
   getSource,
-  listNotebookChunks,
   listNotebooks,
   listSources,
   patchNotebook,
   softDeleteNotebook,
 } from '../lib/v2-store'
+import {
+  getArtifact,
+  getNotebookSourceHashes,
+  listArtifacts,
+  listNotebookChunks,
+} from '../lib/v2-artifacts-store'
 import { generateQueryEmbedding } from '../lib/embeddings'
 import { VectorStore } from '../lib/vectorize'
 
@@ -168,5 +173,62 @@ notebooksV2Manage.get('/:notebookId/chunks', async (c) => {
     chunks,
   })
 })
+
+notebooksV2Manage.get('/:notebookId/artifacts', async (c) => {
+  const workspaceId = requireParam(c.req.param('workspaceId'), 'workspaceId')
+  const notebookId = requireParam(c.req.param('notebookId'), 'notebookId')
+
+  const notebook = await getNotebook(c.env, workspaceId, notebookId)
+  if (!notebook) return c.json({ error: 'notebook not found' }, 404)
+
+  const artifacts = await listArtifacts(c.env, workspaceId, notebookId)
+  const currentHashes = await getNotebookSourceHashes(c.env, workspaceId, notebookId)
+  const currentHashKey = JSON.stringify([...currentHashes].sort())
+
+  return c.json({
+    notebookId,
+    count: artifacts.length,
+    artifacts: artifacts.map((artifact) => ({
+      id: artifact.id,
+      title: artifact.title,
+      template: artifact.template,
+      createdAt: artifact.created_at,
+      snapshotHashes: safeParseHashList(artifact.snapshot_hashes),
+      stale: artifact.snapshot_hashes !== currentHashKey,
+    })),
+  })
+})
+
+notebooksV2Manage.get('/:notebookId/artifacts/:artifactId', async (c) => {
+  const workspaceId = requireParam(c.req.param('workspaceId'), 'workspaceId')
+  const notebookId = requireParam(c.req.param('notebookId'), 'notebookId')
+  const artifactId = requireParam(c.req.param('artifactId'), 'artifactId')
+
+  const artifact = await getArtifact(c.env, workspaceId, notebookId, artifactId)
+  if (!artifact) return c.json({ error: 'artifact not found' }, 404)
+
+  const currentHashes = await getNotebookSourceHashes(c.env, workspaceId, notebookId)
+  const currentHashKey = JSON.stringify([...currentHashes].sort())
+
+  return c.json({
+    id: artifact.id,
+    notebookId: artifact.notebook_id,
+    title: artifact.title,
+    template: artifact.template,
+    content: artifact.content,
+    snapshotHashes: safeParseHashList(artifact.snapshot_hashes),
+    stale: artifact.snapshot_hashes !== currentHashKey,
+    createdAt: artifact.created_at,
+  })
+})
+
+function safeParseHashList(raw: string): string[] {
+  try {
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed.filter((v) => typeof v === 'string') : []
+  } catch {
+    return []
+  }
+}
 
 export { notebooksV2Manage }

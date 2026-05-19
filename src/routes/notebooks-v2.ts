@@ -1,6 +1,16 @@
 import { Hono } from 'hono'
 import type { Env } from '../lib/types'
-import { createNotebook, createSource, type SourceType } from '../lib/v2-store'
+import {
+  createNotebook,
+  createSource,
+  getNotebook,
+  type SourceType,
+} from '../lib/v2-store'
+import {
+  createArtifact,
+  getNotebookSourceHashes,
+  listNotebookChunks,
+} from '../lib/v2-artifacts-store'
 import { generateQueryEmbedding } from '../lib/embeddings'
 import { VectorStore } from '../lib/vectorize'
 import { generateChatResponse } from '../lib/generate'
@@ -265,6 +275,8 @@ notebooksV2.post('/:notebookId/chat', async (c) => {
 })
 
 notebooksV2.post('/:notebookId/artifacts', async (c) => {
+  const workspaceId = requireParam(c.req.param('workspaceId'), 'workspaceId')
+  const notebookId = requireParam(c.req.param('notebookId'), 'notebookId')
   const body = await c.req.json<{
     template: string
     additionalDirectives?: string
@@ -274,14 +286,71 @@ notebooksV2.post('/:notebookId/artifacts', async (c) => {
     return c.json({ error: 'invalid artifact template' }, 400)
   }
 
+  const notebook = await getNotebook(c.env, workspaceId, notebookId)
+  if (!notebook) return c.json({ error: 'notebook not found' }, 404)
+
+  const chunks = await listNotebookChunks(c.env, workspaceId, notebookId, 12)
+  if (chunks.length === 0) {
+    return c.json({ error: 'notebook has no indexed chunks yet' }, 400)
+  }
+
+  const contexts = chunks.map((chunk) => ({
+    id: chunk.id,
+    title: chunk.source_title,
+    text: chunk.content,
+    score: 1,
+  }))
+
+  const templatePrompt = [
+    `Generate a ${body.template} from notebook sources.`,
+    'Use only grounded source content. Cite assumptions as unknown when unsupported.',
+    body.additionalDirectives ?? '',
+  ]
+    .filter(Boolean)
+    .join('\n')
+
+  let content: string
+  try {
+    content = await generateChatResponse(templatePrompt, contexts, [], c.env)
+  } catch {
+    content = [
+      `# ${body.template}`,
+      '',
+      'Model generation unavailable. Source-grounded excerpts:',
+      ...contexts
+        .slice(0, 5)
+        .map((ctx, i) => `${i + 1}. ${ctx.title}: ${ctx.text.slice(0, 320)}`),
+    ].join('\n')
+  }
+
+  const snapshotHashes = await getNotebookSourceHashes(c.env, workspaceId, notebookId)
+  const title = `${body.template.replace(/_/g, ' ')} · ${new Date().toISOString()}`
+
+  const artifact = await createArtifact(c.env, {
+    workspaceId,
+    notebookId,
+    title,
+    template: body.template as
+      | 'briefing_doc'
+      | 'faq_glossary'
+      | 'implementation_plan'
+      | 'world_bible',
+    content,
+    snapshotHashes,
+  })
+
   return c.json(
     {
-      error:
-        'Artifact persistence pipeline is defined in schema but not yet implemented in runtime routes.',
-      template: body.template,
-      next: 'Implement D1 artifact write + citation snapshot binding.',
+      id: artifact.id,
+      notebookId: artifact.notebook_id,
+      title: artifact.title,
+      template: artifact.template,
+      content: artifact.content,
+      snapshotHashes,
+      stale: false,
+      createdAt: artifact.created_at,
     },
-    501
+    201
   )
 })
 

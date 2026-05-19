@@ -903,6 +903,17 @@ paths:
           $ref: '#/components/responses/NotFound'
 
   /api/v2/workspaces/{workspaceId}/notebooks/{notebookId}/artifacts:
+    get:
+      summary: List notebook artifacts
+      operationId: listNotebookArtifactsV2
+      tags: [notebooks-v2]
+      x-auth-scope: read
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/NotebookId'
+      responses:
+        '200':
+          description: Artifact list
     post:
       summary: Build studio artifact
       operationId: buildArtifactV2
@@ -918,8 +929,29 @@ paths:
             schema:
               $ref: '#/components/schemas/ArtifactRequest'
       responses:
-        '501':
-          description: Artifact persistence not yet implemented
+        '201':
+          description: Artifact created
+
+  /api/v2/workspaces/{workspaceId}/notebooks/{notebookId}/artifacts/{artifactId}:
+    get:
+      summary: Get notebook artifact
+      operationId: getNotebookArtifactV2
+      tags: [notebooks-v2]
+      x-auth-scope: read
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/NotebookId'
+        - name: artifactId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Artifact details
+        '404':
+          $ref: '#/components/responses/NotFound'
 
   /api/v2/workspaces/{workspaceId}/notebooks/{notebookId}/jobs/{jobId}:
     get:

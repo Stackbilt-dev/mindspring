@@ -28,7 +28,8 @@
   - vectors in Vectorize with notebook/source/chunk metadata pointers
   - raw files in R2
 - Ingestion supports parser-typed jobs from source registration
-- Current parser coverage: `markdown`, `txt` (+ NDJSON thread-compatible ingest path)
+- Current parser coverage: `markdown`, `txt`, `chat_export` (+ NDJSON thread-compatible ingest path)
+- Artifacts are persisted in D1 with `snapshot_hashes`; stale state is computed by comparing current source hashes.
 
 ## Query Flow
 
