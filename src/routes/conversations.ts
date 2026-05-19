@@ -22,7 +22,7 @@ conversations.get('/', async (c) => {
     conversations: convs.map((conv) => ({
       id: conv.id,
       title: conv.title,
-      text: conv.text.slice(0, 500),
+      text: conv.text_preview,
       create_time: conv.create_time,
       source: conv.source,
     })),

@@ -1,0 +1,5 @@
+ADF: 0.1
+
+📋 CONTEXT:
+  - Cloudflare Workers edge runtime (wrangler deploy)
+  - Hono for route composition — typed, lightweight, edge-compatible

@@ -1,30 +1,22 @@
-# MindSpring — Core Agent Context
+ADF: 0.1
 
-## Runtime
-- Cloudflare Workers (edge runtime, not Node.js)
-- Hono web framework (only runtime dependency)
-- TypeScript in strict mode, ESNext target, bundler module resolution
-- Wrangler CLI for dev/deploy (`wrangler dev`, `wrangler deploy`)
-- Vitest for testing
+📋 CONTEXT [advisory]:
+  - project: mindspring — Semantic search and topic exploration for AI conversation exports, deployed on Cloudflare Workers
+  - <div align="center"> <img src="assets/banner.png" alt="MindSpring — semantic conversation search" width="100%" />
+  - runtime: edge-worker, node
+  - stack: hono
 
-## Storage
-- **Vectorize** — Vector search index (1024-dim cosine, bge-large-en-v1.5 embeddings). Stores vectors + metadata previews (10KB limit).
-- **KV** — Auth keys (`apikey:` prefix), conversation full text (`conv:` prefix), upload state, rate limit counters, telemetry flow logs (`flowlog:` prefix, 7-day TTL).
-- **R2** — Raw uploaded conversation JSON files. Multipart upload for files >5MB.
-- **Queue** — Async ingestion pipeline. Single message per upload, max 3 retries, dead letter queue for failures.
-- **Workers AI** — Embedding generation (`@cf/baai/bge-large-en-v1.5`) and text generation (`@cf/deepseek-ai/deepseek-r1-distill-qwen-32b` for RAG chat).
-
-## Auth Model
-- API key-based auth via `Authorization: Bearer <key>` or `X-API-Key` header.
-- Three hierarchical scopes: `read` < `ingest` < `admin`.
-- Keys stored in KV under `apikey:` prefix. Bootstrap key created via `wrangler kv key put`.
-- Rate limiting per key via KV-backed sliding window.
-
-## Architectural Patterns
-- **Single Worker deployment** — API routes and static frontend served from the same Worker.
-- **Module size cap** — Every source file stays under 400 lines.
-- **Zero external dependencies** — Only Hono at runtime; everything else is Cloudflare platform bindings.
-- **Streaming ingestion** — Large files (up to 1GB+) parsed via custom streaming JSON parser. Never loads entire file into memory.
-- **Checkpoint recovery** — Ingestion checkpoints to KV every 100 conversations. Queue redelivery resumes from last checkpoint.
-- **Frontend** — Vanilla HTML/CSS/JS SPA in `frontend/`, no build step, no framework. Served via Workers Assets binding.
-- **OpenAPI spec** — `openapi.yaml` is the API source of truth.
+⚠ CONSTRAINTS [advisory]:
+  - **Runtime**: Cloudflare Workers with Hono framework. Single Worker serves both API and static frontend.
+  - **Language**: TypeScript (strict mode, ESNext target, bundler module resolution).
+  - **Only runtime dependency**: Hono. Everything else is Cloudflare platform bindings.
+  - **Module size limit**: Every module stays under 400 lines.
+  - **Storage**: Vectorize (vectors + metadata), KV (auth keys, conversation text, telemetry, rate limits), R2 (raw file uploads).
+  - **Auth**: API key via `Authorization: Bearer <key>` or `X-API-Key` header. Three scopes: `read` < `ingest` < `admin` (hierarchical).
+  - **Rate limiting**: KV-backed sliding window, configured per route group.
+  - **Telemetry**: Structured `TelemetryEnvelope` objects in KV under `flowlog:` prefix with 7-day TTL.
+  - **Ingestion pipeline**: Upload → R2 → Queue → streaming JSON parse → embed (Workers AI, bge-large-en-v1.5, 1024d) → upsert to Vectorize. Checkpoints to KV every 100 conversations for crash recovery.
+  - **Frontend**: Vanilla HTML/CSS/JS SPA with no build step. Served as static assets via Workers Assets binding.
+  - **Testing**: Vitest.
+  - Use .js extensions for all ESM imports (never .ts in import paths)
+  - No Node.js-specific APIs in Worker handlers; use CF-native APIs (fetch, KV, D1, R2)

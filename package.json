@@ -17,13 +17,19 @@
     "deploy": "wrangler deploy",
     "test": "vitest run",
     "test:watch": "vitest",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "charter:detect": "charter setup --detect-only --format json",
+    "charter:setup": "charter setup --preset fullstack --ci github --yes",
+    "verify:adf": "charter doctor --adf-only --ci --format json && charter adf evidence --auto-measure --ci --format json",
+    "charter:doctor": "charter doctor --format json",
+    "charter:adf:bundle": "charter adf bundle --task \"describe task\" --format json"
   },
   "dependencies": {
     "hono": "^4.7.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250303.0",
+    "@stackbilt/cli": "0.12.1",
     "typescript": "^5.7.0",
     "vitest": "^4.0.18",
     "wrangler": "^4.0.0"
