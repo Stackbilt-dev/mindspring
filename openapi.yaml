@@ -847,6 +847,61 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /api/v2/workspaces/{workspaceId}/notebooks/{notebookId}/search:
+    post:
+      summary: Notebook-scoped semantic search
+      operationId: notebookSearchV2
+      tags: [notebooks-v2]
+      x-auth-scope: read
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/NotebookId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [query]
+              properties:
+                query:
+                  type: string
+                limit:
+                  type: integer
+                  minimum: 1
+                  maximum: 50
+                threshold:
+                  type: number
+                  minimum: 0
+                  maximum: 1
+      responses:
+        '200':
+          description: Notebook scoped search results
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v2/workspaces/{workspaceId}/notebooks/{notebookId}/chunks:
+    get:
+      summary: Notebook chunk diagnostics
+      operationId: notebookChunksV2
+      tags: [notebooks-v2]
+      x-auth-scope: read
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/NotebookId'
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+      responses:
+        '200':
+          description: Raw chunk diagnostics for notebook
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /api/v2/workspaces/{workspaceId}/notebooks/{notebookId}/artifacts:
     post:
       summary: Build studio artifact

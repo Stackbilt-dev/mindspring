@@ -291,3 +291,40 @@ export async function getSource(
 
   return row ?? null
 }
+
+export interface NotebookChunkRecord {
+  id: string
+  notebook_id: string
+  source_id: string
+  content: string
+  chunk_hash: string
+  char_start: number
+  char_end: number
+  created_at: string
+  source_title: string
+}
+
+export async function listNotebookChunks(
+  env: Env,
+  workspaceId: string,
+  notebookId: string,
+  limit: number = 50
+): Promise<NotebookChunkRecord[]> {
+  const db = requireDb(env)
+  const rows = await db
+    .prepare(
+      `SELECT
+         c.id, c.notebook_id, c.source_id, c.content, c.chunk_hash, c.char_start, c.char_end, c.created_at,
+         s.title AS source_title
+       FROM chunks c
+       JOIN sources s ON s.id = c.source_id
+       JOIN notebooks n ON n.id = c.notebook_id
+       WHERE n.workspace_id = ? AND c.notebook_id = ? AND n.deleted_at IS NULL
+       ORDER BY c.created_at DESC
+       LIMIT ?`
+    )
+    .bind(workspaceId, notebookId, limit)
+    .all<NotebookChunkRecord>()
+
+  return rows.results
+}

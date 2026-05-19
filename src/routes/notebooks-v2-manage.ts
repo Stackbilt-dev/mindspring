@@ -3,11 +3,14 @@ import type { Env } from '../lib/types'
 import {
   getNotebook,
   getSource,
+  listNotebookChunks,
   listNotebooks,
   listSources,
   patchNotebook,
   softDeleteNotebook,
 } from '../lib/v2-store'
+import { generateQueryEmbedding } from '../lib/embeddings'
+import { VectorStore } from '../lib/vectorize'
 
 const notebooksV2Manage = new Hono<{ Bindings: Env }>()
 
@@ -111,6 +114,59 @@ notebooksV2Manage.get('/:notebookId/sources/:sourceId', async (c) => {
   if (!source) return c.json({ error: 'source not found' }, 404)
 
   return c.json(source)
+})
+
+notebooksV2Manage.post('/:notebookId/search', async (c) => {
+  const workspaceId = requireParam(c.req.param('workspaceId'), 'workspaceId')
+  const notebookId = requireParam(c.req.param('notebookId'), 'notebookId')
+  const body = await c.req.json<{
+    query: string
+    limit?: number
+    threshold?: number
+  }>()
+
+  if (!body.query?.trim()) {
+    return c.json({ error: 'query is required' }, 400)
+  }
+
+  const notebook = await getNotebook(c.env, workspaceId, notebookId)
+  if (!notebook) return c.json({ error: 'notebook not found' }, 404)
+
+  const queryVector = await generateQueryEmbedding(body.query, c.env)
+  const store = new VectorStore(c.env)
+  const limit = Math.min(Math.max(body.limit ?? 10, 1), 50)
+  const threshold = body.threshold ?? 0
+
+  const results = await store.search(queryVector, limit, threshold, {
+    hydrateFullText: true,
+    notebookId,
+  })
+
+  return c.json({
+    query: body.query,
+    notebookId,
+    count: results.length,
+    results,
+  })
+})
+
+notebooksV2Manage.get('/:notebookId/chunks', async (c) => {
+  const workspaceId = requireParam(c.req.param('workspaceId'), 'workspaceId')
+  const notebookId = requireParam(c.req.param('notebookId'), 'notebookId')
+  const limit = Math.min(
+    Math.max(parseInt(c.req.query('limit') ?? '50', 10) || 50, 1),
+    200
+  )
+
+  const notebook = await getNotebook(c.env, workspaceId, notebookId)
+  if (!notebook) return c.json({ error: 'notebook not found' }, 404)
+
+  const chunks = await listNotebookChunks(c.env, workspaceId, notebookId, limit)
+  return c.json({
+    notebookId,
+    count: chunks.length,
+    chunks,
+  })
 })
 
 export { notebooksV2Manage }
