@@ -14,6 +14,7 @@ import { telemetry } from './routes/telemetry'
 import { chat } from './routes/chat'
 import { notebooksV2 } from './routes/notebooks-v2'
 import { notebooksV2Manage } from './routes/notebooks-v2-manage'
+import { workspacesV2 } from './routes/workspaces-v2'
 import { handleIngestion } from './queue'
 
 const app = new Hono<{ Bindings: Env; Variables: AppVariables }>()
@@ -82,6 +83,7 @@ app.route('/api/conversations', conversations)
 // --- Notebook v2: workspace-scoped source intelligence ---
 app.use('/api/v2/workspaces/*', requireAuth('read'))
 app.use('/api/v2/workspaces/*', rateLimit({ maxRequests: 30, windowSeconds: 60 }))
+app.route('/api/v2/workspaces/:workspaceId', workspacesV2)
 app.route('/api/v2/workspaces/:workspaceId/notebooks', notebooksV2)
 app.route('/api/v2/workspaces/:workspaceId/notebooks', notebooksV2Manage)
 

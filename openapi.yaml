@@ -705,6 +705,36 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/Notebook'
+
+  /api/v2/workspaces/{workspaceId}/search:
+    post:
+      summary: Workspace semantic search across notebooks
+      operationId: workspaceSearchV2
+      tags: [notebooks-v2]
+      x-auth-scope: read
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [query]
+              properties:
+                query:
+                  type: string
+                limit:
+                  type: integer
+                  minimum: 1
+                  maximum: 50
+                threshold:
+                  type: number
+                  minimum: 0
+                  maximum: 1
+      responses:
+        '200':
+          description: Workspace-scoped search results with notebook attribution
     post:
       summary: Create notebook
       operationId: createNotebookV2

@@ -149,6 +149,72 @@ export class VectorStore {
   }
 
   /**
+   * Workspace-style semantic search across multiple notebook IDs.
+   * Filters results in application layer using Vectorize metadata pointers.
+   */
+  async searchByNotebookIds(
+    queryVector: number[],
+    notebookIds: string[],
+    limit: number = 10,
+    scoreThreshold: number = 0.3,
+    options: { hydrateFullText?: boolean } = {}
+  ): Promise<Array<SearchResult & { notebook_id?: string }>> {
+    const { hydrateFullText = true } = options
+    if (notebookIds.length === 0) return []
+
+    const notebookIdSet = new Set(notebookIds)
+    const results = await this.vectorize.query(queryVector, {
+      topK: Math.max(limit * 10, 100),
+      returnMetadata: 'all',
+    })
+
+    if (!results.matches || results.matches.length === 0) return []
+
+    const filtered = results.matches
+      .filter((m) => {
+        const meta = m.metadata as unknown as ConversationMetadata
+        return !!meta?.notebook_id && notebookIdSet.has(meta.notebook_id)
+      })
+      .filter((m) => (m.score ?? 0) >= scoreThreshold)
+      .slice(0, limit)
+
+    if (!hydrateFullText) {
+      return filtered.map((match) => {
+        const meta = match.metadata as unknown as ConversationMetadata
+        const convId = meta?.id ?? match.id
+        return {
+          id: convId,
+          title: meta?.title ?? 'Untitled',
+          text: meta?.text_preview ?? '',
+          create_time: meta?.create_time ?? 0,
+          score: match.score ?? 0,
+          notebook_id: meta?.notebook_id,
+        }
+      })
+    }
+
+    return Promise.all(
+      filtered.map(async (match) => {
+        const meta = match.metadata as unknown as ConversationMetadata
+        const convId = meta?.id ?? match.id
+        const fullRaw = await this.kv.get(`conv:${convId}`)
+        const full: ConversationRecord | null = fullRaw
+          ? JSON.parse(fullRaw)
+          : null
+
+        return {
+          id: convId,
+          title: full?.title ?? meta?.title ?? 'Untitled',
+          text: full?.text ?? meta?.text_preview ?? '',
+          create_time: full?.create_time ?? meta?.create_time ?? 0,
+          score: match.score ?? 0,
+          notebook_id: full?.notebook_id ?? meta?.notebook_id,
+        }
+      })
+    )
+  }
+
+  /**
    * Get a single conversation by ID from KV.
    */
   async getById(id: string): Promise<ConversationRecord | null> {
