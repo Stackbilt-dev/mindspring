@@ -1,2 +1,11 @@
-# mindspring ADF Manifest
-load core.adf always
+ADF: 0.1
+
+🎯 ROLE: MindSpring context router
+
+📦 DEFAULT_LOAD:
+  - core.adf
+  - state.adf
+
+📂 ON_DEMAND:
+  - backend.adf (Triggers on: backend, api, hono, worker, queue, vectorize, kv, r2, upload, ingestion, telemetry)
+  - frontend.adf (Triggers on: frontend, ui, css, vanilla js, app.js, styles, spa)

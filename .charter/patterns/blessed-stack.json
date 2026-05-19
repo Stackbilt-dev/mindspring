@@ -1,0 +1,63 @@
+{
+  "customized": false,
+  "preset": "fullstack",
+  "generatedAt": "2026-05-19T09:18:18.006Z",
+  "patterns": [
+    {
+      "name": "Hono API Layer",
+      "category": "INTEGRATION",
+      "blessed_solution": "Hono route composition for worker/backend APIs",
+      "rationale": "Typed lightweight router aligned to edge/server runtimes",
+      "anti_patterns": "Avoid ad-hoc route registration patterns per handler file",
+      "status": "ACTIVE"
+    },
+    {
+      "name": "Cloudflare Worker Runtime",
+      "category": "COMPUTE",
+      "blessed_solution": "Cloudflare Workers + Wrangler deployment workflow",
+      "rationale": "Cloudflare-native edge execution for APIs and middleware",
+      "anti_patterns": "Avoid mixing non-edge runtime assumptions into worker handlers",
+      "status": "ACTIVE"
+    },
+    {
+      "name": "App Runtime Split",
+      "category": "COMPUTE",
+      "blessed_solution": "Frontend app plus API service/edge runtime split",
+      "rationale": "Clear ownership between UI and backend concerns",
+      "anti_patterns": "Avoid coupling frontend state logic directly to DB models",
+      "status": "ACTIVE"
+    },
+    {
+      "name": "Primary Data Store",
+      "category": "DATA",
+      "blessed_solution": "Single primary transactional data layer with migrations",
+      "rationale": "Consistent source of truth for read/write paths",
+      "anti_patterns": "Avoid duplicating write sources across multiple stores",
+      "status": "ACTIVE"
+    },
+    {
+      "name": "API Integration Boundary",
+      "category": "INTEGRATION",
+      "blessed_solution": "Typed API client/server contracts",
+      "rationale": "Reduces interface drift between frontend and backend",
+      "anti_patterns": "Avoid undocumented cross-layer payload assumptions",
+      "status": "ACTIVE"
+    },
+    {
+      "name": "Background Processing",
+      "category": "ASYNC",
+      "blessed_solution": "Queue/job model for notifications and batch workflows",
+      "rationale": "Protects user-facing latency from long-running tasks",
+      "anti_patterns": "Avoid synchronous execution of retry-prone integrations",
+      "status": "ACTIVE"
+    },
+    {
+      "name": "Security Baseline",
+      "category": "SECURITY",
+      "blessed_solution": "Centralized authn/authz and secret management policy",
+      "rationale": "Consistent controls across frontend/backend surfaces",
+      "anti_patterns": "Avoid mixed auth patterns across services and clients",
+      "status": "ACTIVE"
+    }
+  ]
+}

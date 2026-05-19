@@ -19,7 +19,9 @@ search.get('/', async (c) => {
 
   const store = new VectorStore(c.env)
   const queryVector = await generateQueryEmbedding(query, c.env)
-  const results = await store.search(queryVector, limit, threshold)
+  const results = await store.search(queryVector, limit, threshold, {
+    hydrateFullText: false,
+  })
 
   return c.json({
     query,

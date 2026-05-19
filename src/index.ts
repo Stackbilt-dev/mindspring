@@ -39,30 +39,41 @@ app.use('/api/*', async (c, next) => {
 app.route('/api/auth', auth)
 
 // --- Telemetry query: admin only ---
+app.use('/api/telemetry', requireAuth('admin'))
 app.use('/api/telemetry/*', requireAuth('admin'))
 app.route('/api/telemetry', telemetry)
 
 // --- Uploads: requires 'ingest' scope ---
+app.use('/api/uploads', requireAuth('ingest'))
 app.use('/api/uploads/*', requireAuth('ingest'))
+app.use('/api/uploads', validateUpload())
 app.use('/api/uploads/*', validateUpload())
 // Status polling gets a generous limit; upload mutations are tighter
 app.use('/api/uploads/*/status', rateLimit({ maxRequests: 60, windowSeconds: 60 }))
+app.use('/api/uploads', rateLimit({ maxRequests: 20, windowSeconds: 60 }))
 app.use('/api/uploads/*', rateLimit({ maxRequests: 20, windowSeconds: 60 }))
 app.route('/api/uploads', upload)
 
 // --- Search: requires 'read' scope ---
+app.use('/api/search', requireAuth('read'))
 app.use('/api/search/*', requireAuth('read'))
+app.use('/api/search', validateSearchParams())
 app.use('/api/search/*', validateSearchParams())
+app.use('/api/search', rateLimit({ maxRequests: 60, windowSeconds: 60 }))
 app.use('/api/search/*', rateLimit({ maxRequests: 60, windowSeconds: 60 }))
 app.route('/api/search', search)
 
 // --- Chat (RAG): requires 'read' scope ---
+app.use('/api/chat', requireAuth('read'))
 app.use('/api/chat/*', requireAuth('read'))
+app.use('/api/chat', rateLimit({ maxRequests: 20, windowSeconds: 60 }))
 app.use('/api/chat/*', rateLimit({ maxRequests: 20, windowSeconds: 60 }))
 app.route('/api/chat', chat)
 
 // --- Conversations: requires 'read' scope ---
+app.use('/api/conversations', requireAuth('read'))
 app.use('/api/conversations/*', requireAuth('read'))
+app.use('/api/conversations', rateLimit({ maxRequests: 60, windowSeconds: 60 }))
 app.use('/api/conversations/*', rateLimit({ maxRequests: 60, windowSeconds: 60 }))
 app.route('/api/conversations', conversations)
 

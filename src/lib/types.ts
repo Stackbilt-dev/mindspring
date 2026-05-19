@@ -76,6 +76,15 @@ export interface ConversationRecord {
   upload_id: string
 }
 
+// Lightweight conversation summary for browse/search preview paths.
+export interface ConversationSummaryRecord {
+  id: string
+  title: string
+  text_preview: string
+  create_time: number
+  source: 'gpt' | 'claude'
+}
+
 // Search result returned to clients
 export interface SearchResult {
   id: string
