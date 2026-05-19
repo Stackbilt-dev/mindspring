@@ -24,6 +24,7 @@ export interface Env {
   AI: Ai
   VECTORIZE: VectorizeIndex
   ASSETS: Fetcher
+  DB?: D1Database
 
   // Vars
   EMBEDDING_MODEL: string
@@ -33,8 +34,15 @@ export interface Env {
 
 // Queue message for ingestion jobs
 export interface IngestionMessage {
-  uploadId: string
-  r2Key: string
+  uploadId?: string
+  r2Key?: string
+  job_id?: string
+  workspace_id?: string
+  notebook_id?: string
+  source_id?: string
+  r2_key?: string
+  parser_type?: 'markdown' | 'txt' | 'pdf' | 'url' | 'chat_export'
+  content_hash?: string
   userId?: string
 }
 
@@ -61,8 +69,12 @@ export interface ConversationMetadata {
   text_preview: string  // First 500 chars for display
   create_time: number
   update_time: number
-  source: 'gpt' | 'claude'
+  source: 'gpt' | 'claude' | 'doc'
   upload_id: string
+  notebook_id?: string
+  source_id?: string
+  chunk_id?: string
+  content_hash?: string
 }
 
 // Full conversation record stored in KV
@@ -72,8 +84,12 @@ export interface ConversationRecord {
   text: string
   create_time: number
   update_time: number
-  source: 'gpt' | 'claude'
+  source: 'gpt' | 'claude' | 'doc'
   upload_id: string
+  notebook_id?: string
+  source_id?: string
+  chunk_id?: string
+  content_hash?: string
 }
 
 // Lightweight conversation summary for browse/search preview paths.
@@ -82,7 +98,7 @@ export interface ConversationSummaryRecord {
   title: string
   text_preview: string
   create_time: number
-  source: 'gpt' | 'claude'
+  source: 'gpt' | 'claude' | 'doc'
 }
 
 // Search result returned to clients

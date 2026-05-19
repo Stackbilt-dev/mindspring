@@ -52,12 +52,18 @@ dead_letter_queue = "mindspring-ingestion-dlq"
 # --- KV: auth keys, upload progress, conversation text, processed IDs, telemetry ---
 [[kv_namespaces]]
 binding = "KV"
-id = "YOUR_KV_NAMESPACE_ID"        # Create with: npx wrangler kv namespace create KV
-preview_id = "YOUR_KV_PREVIEW_ID"  # Create with: npx wrangler kv namespace create KV --preview
+id = "19e32e801eef421e8df4ddf70e6c6a73"        # MINDSPRING_KV
+preview_id = "ee3aef76295445ccb69757a6b5ef72dd"  # MINDSPRING_KV_preview
 
 # --- Workers AI: embedding generation ---
 [ai]
 binding = "AI"
+
+# --- D1: notebooks/sources/chunks/artifacts relational layer ---
+[[d1_databases]]
+binding = "DB"
+database_name = "mindspring-db"
+database_id = "f6be6c43-d314-41be-a7a6-72e947f3688f"
 
 # --- Environment variables ---
 [vars]

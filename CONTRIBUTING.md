@@ -113,3 +113,13 @@ Open an issue on GitHub with:
 - Steps to reproduce
 - Expected vs actual behavior
 - Relevant error messages or telemetry output
+
+## OSS Hygiene
+
+This is a public repository. Do not commit local/personal tooling artifacts.
+
+Blocked files and patterns:
+- `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.cursorrules`, `copilot-instructions.md`
+- `*.pre-adf-migrate.bak`
+- `.charter/telemetry/*`
+- `.env`, `.dev.vars`

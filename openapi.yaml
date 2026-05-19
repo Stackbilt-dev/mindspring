@@ -677,6 +677,105 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /api/v2/workspaces/{workspaceId}/notebooks:
+    post:
+      summary: Create notebook
+      operationId: createNotebookV2
+      tags: [notebooks-v2]
+      x-auth-scope: read
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotebookCreateRequest'
+      responses:
+        '201':
+          description: Notebook created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notebook'
+
+  /api/v2/workspaces/{workspaceId}/notebooks/{notebookId}/sources:
+    post:
+      summary: Register source upload
+      operationId: registerSourceUploadV2
+      tags: [notebooks-v2]
+      x-auth-scope: read
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/NotebookId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterSourceUploadRequest'
+      responses:
+        '202':
+          description: Source accepted and ingestion queued
+
+  /api/v2/workspaces/{workspaceId}/notebooks/{notebookId}/chat:
+    post:
+      summary: Notebook-scoped chat
+      operationId: notebookChatV2
+      tags: [notebooks-v2]
+      x-auth-scope: read
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/NotebookId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotebookChatRequest'
+      responses:
+        '200':
+          description: Chat response with citations
+
+  /api/v2/workspaces/{workspaceId}/notebooks/{notebookId}/artifacts:
+    post:
+      summary: Build studio artifact
+      operationId: buildArtifactV2
+      tags: [notebooks-v2]
+      x-auth-scope: read
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/NotebookId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ArtifactRequest'
+      responses:
+        '501':
+          description: Artifact persistence not yet implemented
+
+  /api/v2/workspaces/{workspaceId}/notebooks/{notebookId}/jobs/{jobId}:
+    get:
+      summary: Get ingestion job status
+      operationId: getNotebookIngestionJobV2
+      tags: [notebooks-v2]
+      x-auth-scope: read
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/NotebookId'
+        - $ref: '#/components/parameters/JobId'
+      responses:
+        '200':
+          description: Job status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestionJobStatus'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
 components:
   securitySchemes:
     bearerAuth:
@@ -690,6 +789,27 @@ components:
       description: 'API key via header: `X-API-Key: ms_...`'
 
   parameters:
+    WorkspaceId:
+      name: workspaceId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    NotebookId:
+      name: notebookId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    JobId:
+      name: jobId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
     ConversationId:
       name: id
       in: path
@@ -707,6 +827,113 @@ components:
         format: uuid
 
   schemas:
+    Notebook:
+      type: object
+      required: [id, workspace_id, title, type, instructions, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        workspace_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        type:
+          type: string
+          enum: [dev_docs, style_guide, narrative_bible, workflow_ops, personal_archive]
+        instructions:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    NotebookCreateRequest:
+      type: object
+      required: [title, type]
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        type:
+          type: string
+          enum: [dev_docs, style_guide, narrative_bible, workflow_ops, personal_archive]
+        instructions:
+          type: string
+    RegisterSourceUploadRequest:
+      type: object
+      required: [title, type, sourceUploadId]
+      properties:
+        title:
+          type: string
+        type:
+          type: string
+          enum: [markdown, txt, pdf, url, chat_export]
+        sourceUploadId:
+          type: string
+          format: uuid
+        parserType:
+          type: string
+          enum: [markdown, txt, pdf, url, chat_export]
+        contentHash:
+          type: string
+    NotebookChatRequest:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+        history:
+          type: array
+          items:
+            type: object
+            required: [role, content]
+            properties:
+              role:
+                type: string
+                enum: [user, assistant]
+              content:
+                type: string
+    ArtifactRequest:
+      type: object
+      required: [template]
+      properties:
+        template:
+          type: string
+          enum: [briefing_doc, faq_glossary, implementation_plan, world_bible]
+        additionalDirectives:
+          type: string
+    IngestionJobStatus:
+      type: object
+      required: [jobId, workspaceId, notebookId, sourceId, status, updatedAt]
+      properties:
+        jobId:
+          type: string
+          format: uuid
+        workspaceId:
+          type: string
+          format: uuid
+        notebookId:
+          type: string
+          format: uuid
+        sourceId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [queued, parsing, embedding, completed, failed]
+        errorMessage:
+          type: string
+          nullable: true
+        updatedAt:
+          type: string
+          format: date-time
     SearchResult:
       type: object
       required: [id, title, text, create_time, score]

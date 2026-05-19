@@ -15,6 +15,7 @@ import {
 } from './lib/extract'
 import { streamParseBatched } from './lib/stream-parser'
 import { logIngestionEvent } from './lib/telemetry'
+import { processV2Ingestion, type V2IngestionPayload } from './lib/v2-ingestion'
 
 /**
  * Queue consumer — processes uploaded conversation JSON files.
@@ -39,12 +40,41 @@ export async function handleIngestion(
   env: Env
 ): Promise<void> {
   for (const message of batch.messages) {
-    const { uploadId, r2Key } = message.body
+    const maybeUploadId = message.body.uploadId ?? message.body.job_id
+    const maybeR2Key = message.body.r2Key ?? message.body.r2_key
     const startTime = Date.now()
 
     try {
+      if (!maybeUploadId || !maybeR2Key) {
+        throw new Error('Invalid ingestion message: missing upload/job id or r2 key')
+      }
+      const uploadId = maybeUploadId
+      const r2Key = maybeR2Key
       await logIngestionEvent(env, { uploadId, action: 'started' })
-      await processUpload(uploadId, r2Key, env)
+      if (
+        message.body.job_id &&
+        message.body.workspace_id &&
+        message.body.notebook_id &&
+        message.body.source_id &&
+        message.body.r2_key &&
+        message.body.parser_type
+      ) {
+        await processV2Ingestion(env, {
+          job_id: message.body.job_id,
+          workspace_id: message.body.workspace_id,
+          notebook_id: message.body.notebook_id,
+          source_id: message.body.source_id,
+          r2_key: message.body.r2_key,
+          parser_type: message.body.parser_type,
+          content_hash: message.body.content_hash ?? '',
+        } satisfies V2IngestionPayload)
+      } else {
+        await processUpload(uploadId, r2Key, env, {
+          notebookId: message.body.notebook_id,
+          sourceId: message.body.source_id,
+          contentHash: message.body.content_hash,
+        })
+      }
       await logIngestionEvent(env, {
         uploadId,
         action: 'completed',
@@ -52,19 +82,21 @@ export async function handleIngestion(
       })
       message.ack()
     } catch (err) {
-      console.error(`Ingestion failed for ${uploadId}:`, err)
+      console.error(`Ingestion failed for ${maybeUploadId ?? 'unknown'}:`, err)
 
-      await logIngestionEvent(env, {
-        uploadId,
-        action: 'failed',
-        durationMs: Date.now() - startTime,
-        errorMessage: String(err),
-      })
+      if (maybeUploadId) {
+        await logIngestionEvent(env, {
+          uploadId: maybeUploadId,
+          action: 'failed',
+          durationMs: Date.now() - startTime,
+          errorMessage: String(err),
+        })
 
-      await updateProgress(env, uploadId, {
-        status: 'failed',
-        errorMessage: String(err),
-      })
+        await updateProgress(env, maybeUploadId, {
+          status: 'failed',
+          errorMessage: String(err),
+        })
+      }
 
       message.retry()
     }
@@ -74,14 +106,19 @@ export async function handleIngestion(
 async function processUpload(
   uploadId: string,
   r2Key: string,
-  env: Env
+  env: Env,
+  context?: {
+    notebookId?: string
+    sourceId?: string
+    contentHash?: string
+  }
 ): Promise<void> {
   const progress = await getProgress(env, uploadId)
-  if (!progress) {
+  if (!progress && !context?.sourceId) {
     throw new Error(`No progress record for upload ${uploadId}`)
   }
 
-  if (progress.status === 'completed') {
+  if (progress?.status === 'completed') {
     return // Idempotent — already done
   }
 
@@ -98,9 +135,9 @@ async function processUpload(
 
   const store = new VectorStore(env)
   const resumeFromBatch = Math.floor(
-    progress.lastCheckpointIndex / BATCH_SIZE
+    (progress?.lastCheckpointIndex ?? 0) / BATCH_SIZE
   )
-  let processedCount = progress.processedConversations
+  let processedCount = progress?.processedConversations ?? 0
   let parseErrors = 0
 
   // Stream-parse the JSON, processing items in batches of 100
@@ -141,10 +178,12 @@ async function processUpload(
 
       if (validItems.length === 0) {
         processedCount += items.length
-        await updateProgress(env, uploadId, {
-          processedConversations: processedCount,
-          lastCheckpointIndex: startItemIndex + items.length,
-        })
+        if (progress) {
+          await updateProgress(env, uploadId, {
+            processedConversations: processedCount,
+            lastCheckpointIndex: startItemIndex + items.length,
+          })
+        }
         return
       }
 
@@ -169,6 +208,10 @@ async function processUpload(
               : Date.now() / 1000,
           source: detectFormat(conv),
           upload_id: uploadId,
+          notebook_id: context?.notebookId,
+          source_id: context?.sourceId,
+          chunk_id: item.id,
+          content_hash: context?.contentHash,
         }
 
         return {
@@ -188,11 +231,13 @@ async function processUpload(
       processedCount += items.length
 
       // Checkpoint after each batch — the resume point if we crash
-      await updateProgress(env, uploadId, {
-        totalConversations: null,
-        processedConversations: processedCount,
-        lastCheckpointIndex: startItemIndex + items.length,
-      })
+      if (progress) {
+        await updateProgress(env, uploadId, {
+          totalConversations: null,
+          processedConversations: processedCount,
+          lastCheckpointIndex: startItemIndex + items.length,
+        })
+      }
     },
     // Parse error callback — log and continue
     (error, rawChunk, index) => {
@@ -204,15 +249,17 @@ async function processUpload(
   )
 
   // Final status
-  await updateProgress(env, uploadId, {
-    status: 'completed',
-    totalConversations: totalItems,
-    processedConversations: totalItems,
-    errorMessage:
-      parseErrors > 0
-        ? `Completed with ${parseErrors} parse error(s)`
-        : undefined,
-  })
+  if (progress) {
+    await updateProgress(env, uploadId, {
+      status: 'completed',
+      totalConversations: totalItems,
+      processedConversations: totalItems,
+      errorMessage:
+        parseErrors > 0
+          ? `Completed with ${parseErrors} parse error(s)`
+          : undefined,
+    })
+  }
 
   console.log(
     `Ingestion complete: ${uploadId} — ${totalItems} items in ${batchCount} batches` +

@@ -12,6 +12,7 @@ import { stats } from './routes/stats'
 import { auth } from './routes/auth'
 import { telemetry } from './routes/telemetry'
 import { chat } from './routes/chat'
+import { notebooksV2 } from './routes/notebooks-v2'
 import { handleIngestion } from './queue'
 
 const app = new Hono<{ Bindings: Env; Variables: AppVariables }>()
@@ -76,6 +77,11 @@ app.use('/api/conversations/*', requireAuth('read'))
 app.use('/api/conversations', rateLimit({ maxRequests: 60, windowSeconds: 60 }))
 app.use('/api/conversations/*', rateLimit({ maxRequests: 60, windowSeconds: 60 }))
 app.route('/api/conversations', conversations)
+
+// --- Notebook v2: workspace-scoped source intelligence ---
+app.use('/api/v2/workspaces/*', requireAuth('read'))
+app.use('/api/v2/workspaces/*', rateLimit({ maxRequests: 30, windowSeconds: 60 }))
+app.route('/api/v2/workspaces/:workspaceId/notebooks', notebooksV2)
 
 // --- Stats: requires 'read' scope ---
 app.use('/api/stats', requireAuth('read'))

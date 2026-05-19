@@ -6,6 +6,17 @@ dist/
 .pnpm-store/
 __pycache__/
 
+# Agent/editor local instruction overlays (do not commit to OSS)
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+.cursorrules
+copilot-instructions.md
+*.pre-adf-migrate.bak
+
+# Local telemetry artifacts
+.charter/telemetry/
+
 # cc-taskrunner worktree protection
 C:*
 

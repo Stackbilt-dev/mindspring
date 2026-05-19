@@ -8,6 +8,30 @@ Semantic search engine for AI conversation exports, deployed on Cloudflare Worke
 
 Upload your ChatGPT or Claude conversation exports, and MindSpring indexes them into a vector database for semantic search, similarity analysis, and RAG-powered chat — all running at the edge with zero GPU infrastructure to manage.
 
+## Current State
+
+MindSpring is currently in a hybrid state:
+
+- `v1` routes (`/api/*`) are production-ready for conversation export ingestion/search/chat.
+- `v2` routes (`/api/v2/workspaces/:workspaceId/notebooks/*`) are live for notebook scaffolding and backend ingestion flow:
+  - create notebook
+  - register source upload
+  - job status polling
+  - notebook-scoped chat with citations
+- `v2` parser support is currently limited to `markdown` and `txt`.
+- `v2` artifact persistence is not implemented yet (`501` placeholder route).
+
+## OSS Hygiene Policy
+
+This repository is public OSS. Keep it free of personal/local-agent artifacts.
+
+Never commit:
+
+- local agent instruction overlays (`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.cursorrules`, `copilot-instructions.md`)
+- migration backup files (`*.pre-adf-migrate.bak`)
+- local telemetry artifacts (`.charter/telemetry/*`)
+- local secrets (`.env`, `.dev.vars`)
+
 ## Architecture
 
 ```

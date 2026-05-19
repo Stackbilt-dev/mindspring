@@ -73,6 +73,14 @@ export class VectorStore {
         update_time: item.record.update_time,
         source: item.record.source,
         upload_id: item.record.upload_id,
+        ...(item.record.notebook_id
+          ? { notebook_id: item.record.notebook_id }
+          : {}),
+        ...(item.record.source_id ? { source_id: item.record.source_id } : {}),
+        ...(item.record.chunk_id ? { chunk_id: item.record.chunk_id } : {}),
+        ...(item.record.content_hash
+          ? { content_hash: item.record.content_hash }
+          : {}),
       } satisfies ConversationMetadata,
     }))
 
@@ -86,20 +94,25 @@ export class VectorStore {
     queryVector: number[],
     limit: number = 10,
     scoreThreshold: number = 0.3,
-    options: { hydrateFullText?: boolean } = {}
+    options: { hydrateFullText?: boolean; notebookId?: string } = {}
   ): Promise<SearchResult[]> {
-    const { hydrateFullText = true } = options
+    const { hydrateFullText = true, notebookId } = options
     const results = await this.vectorize.query(queryVector, {
-      topK: limit,
+      topK: notebookId ? Math.max(limit * 5, 50) : limit,
       returnMetadata: 'all',
     })
 
     if (!results.matches || results.matches.length === 0) return []
 
-    // Filter by score threshold and hydrate full text from KV
-    const filtered = results.matches.filter(
-      (m) => (m.score ?? 0) >= scoreThreshold
-    )
+    // Filter by notebook scope (if present) and score threshold.
+    const filtered = results.matches
+      .filter((m) => {
+        if (!notebookId) return true
+        const meta = m.metadata as unknown as ConversationMetadata
+        return meta?.notebook_id === notebookId
+      })
+      .filter((m) => (m.score ?? 0) >= scoreThreshold)
+      .slice(0, limit)
 
     if (!hydrateFullText) {
       return filtered.map((match) => {

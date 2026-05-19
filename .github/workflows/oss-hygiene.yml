@@ -1,0 +1,29 @@
+name: OSS Hygiene
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  blocked-files:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fail on blocked tracked files
+        shell: bash
+        run: |
+          set -euo pipefail
+          blocked_regex='^(AGENTS\.md|CLAUDE\.md|GEMINI\.md|\.cursorrules|copilot-instructions\.md|.*\.pre-adf-migrate\.bak|\.env$|\.dev\.vars$|\.charter/telemetry/)'
+
+          blocked=$(git ls-files | grep -E "$blocked_regex" || true)
+
+          if [[ -n "$blocked" ]]; then
+            echo "Blocked files are tracked in this repository:"
+            echo "$blocked"
+            exit 1
+          fi
+
+          echo "OSS hygiene check passed."
