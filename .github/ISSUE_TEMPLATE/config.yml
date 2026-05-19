@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security Disclosure (Private)
+    url: https://github.com/Stackbilt-dev/mindspring/security/advisories/new
+    about: Report security issues privately. Do not post secrets or PII in public issues.

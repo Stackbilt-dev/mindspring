@@ -1,0 +1,68 @@
+name: Bug Report (Public-Safe)
+description: Report a reproducible bug without secrets or PII.
+title: "bug: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This is a public OSS repository.
+        Do not include personal data, customer identifiers, access tokens, emails, phone numbers, or raw payloads.
+
+  - type: input
+    id: summary
+    attributes:
+      label: Summary
+      description: One-sentence bug description.
+      placeholder: Notebook chat returns 500 for workspace-scoped queries
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What should happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What happens instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction Steps
+      description: Provide deterministic steps with sanitized inputs.
+      placeholder: |
+        1. Create notebook with type workflow_ops
+        2. Register source upload using sourceUploadId
+        3. POST notebook chat request
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Sanitized Evidence
+      description: Add redacted logs/errors only. Replace identifiers with placeholders like <CLIENT_A>.
+      render: shell
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: pii_check
+    attributes:
+      label: Public Data Safety Checklist
+      options:
+        - label: I removed secrets, tokens, API keys, and credentials.
+          required: true
+        - label: I removed or anonymized PII and customer-specific identifiers.
+          required: true
+        - label: I replaced sensitive values with placeholders (for example, <USER_001>).
+          required: true

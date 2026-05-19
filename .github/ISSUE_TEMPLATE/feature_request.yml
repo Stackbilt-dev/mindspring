@@ -1,0 +1,55 @@
+name: Feature Request (Public-Safe)
+description: Propose a feature without private customer context.
+title: "feat: "
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This issue is public. Keep examples generic and sanitized.
+        If your request depends on customer/private context, reference a private tracker ID only.
+
+  - type: input
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: What problem are we solving?
+      placeholder: Need deterministic notebook ingestion status polling for UI orchestration
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed Solution
+      description: Technical proposal with neutral/sanitized context.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria
+      description: Define clear, testable outcomes.
+      placeholder: |
+        - GET /api/v2/.../jobs/:jobId returns status transitions
+        - smoke:v2 passes in CI
+    validations:
+      required: true
+
+  - type: input
+    id: private_ref
+    attributes:
+      label: Private Tracker Reference (Optional)
+      description: Link only a neutral ID (for example, INT-4821). No private details.
+      placeholder: INT-4821
+
+  - type: checkboxes
+    id: pii_check
+    attributes:
+      label: Public Data Safety Checklist
+      options:
+        - label: I did not include PII, customer names, account IDs, or private URLs.
+          required: true
+        - label: I did not include tokens, credentials, or internal secrets.
+          required: true

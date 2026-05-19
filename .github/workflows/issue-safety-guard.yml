@@ -1,0 +1,71 @@
+name: Issue Safety Guard
+
+on:
+  issues:
+    types: [opened, edited]
+  issue_comment:
+    types: [created, edited]
+
+permissions:
+  issues: write
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Scan issue/comment text for likely PII or secrets
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const isIssueEvent = !!context.payload.issue && !context.payload.comment;
+            const isCommentEvent = !!context.payload.comment;
+
+            const body = isCommentEvent
+              ? (context.payload.comment.body || '')
+              : (context.payload.issue.body || '');
+
+            const title = isIssueEvent ? (context.payload.issue.title || '') : '';
+            const text = `${title}\n${body}`;
+
+            const patterns = [
+              { name: 'email', re: /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/ig },
+              { name: 'phone', re: /\+?\d[\d\s().-]{7,}\d/g },
+              { name: 'aws_access_key', re: /AKIA[0-9A-Z]{16}/g },
+              { name: 'github_token', re: /gh[pousr]_[A-Za-z0-9_]{20,}/g },
+              { name: 'bearer_token', re: /Bearer\s+[A-Za-z0-9._\-]{16,}/ig },
+              { name: 'private_key_block', re: /-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----/g },
+              { name: 'generic_api_key', re: /(?:api[_-]?key|token|secret)\s*[:=]\s*["']?[A-Za-z0-9._\-]{16,}["']?/ig },
+            ];
+
+            const findings = [];
+            for (const p of patterns) {
+              if (p.re.test(text)) findings.push(p.name);
+            }
+
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const issue_number = context.payload.issue.number;
+
+            if (findings.length === 0) {
+              core.info('No potential sensitive patterns found.');
+              return;
+            }
+
+            const label = 'needs-redaction';
+            try {
+              await github.rest.issues.addLabels({ owner, repo, issue_number, labels: [label] });
+            } catch (e) {
+              core.warning(`Could not add label ${label}: ${e.message}`);
+            }
+
+            const marker = '<!-- issue-safety-guard -->';
+            const warning = `${marker}\n⚠️ This content may include sensitive data (${findings.join(', ')}).\nPlease redact PII/secrets and replace with placeholders (for example, \`<CLIENT_A>\`, \`<TOKEN_REDACTED>\`).\nIf this is a real vulnerability or secret exposure, use a private security advisory: https://github.com/${owner}/${repo}/security/advisories/new`;
+
+            const comments = await github.rest.issues.listComments({ owner, repo, issue_number, per_page: 100 });
+            const alreadyPosted = comments.data.some(c => (c.body || '').includes(marker));
+
+            if (!alreadyPosted) {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body: warning });
+            } else {
+              core.info('Safety warning already posted.');
+            }
