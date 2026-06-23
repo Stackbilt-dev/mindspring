@@ -30,7 +30,7 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250303.0",
-    "@stackbilt/cli": "0.12.1",
+    "@stackbilt/cli": "^1.6.0",
     "typescript": "^5.7.0",
     "vitest": "^4.0.18",
     "wrangler": "^4.0.0"
